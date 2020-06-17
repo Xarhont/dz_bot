@@ -183,6 +183,9 @@ def dz_delete3(call):
         my_bot.answer_callback_query(call.id, text="ДЗ удалено")
 
 
+
+
+
 #начало проверки ДЗ, выбор класса
 def dz_check1(message):
     user_id = message.chat.id
