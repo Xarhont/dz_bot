@@ -45,6 +45,16 @@ def new_example_added_to_bd(example: Example):
     TestExample.create(theme=example.theme, photo=example.photo, answer=example.answer)
 
 
+class Multi_dz_theme:
+    tema: str
+    active: str
+    count: int
+
+    def __init__(self, tema, active, count):
+        self.tema = tema
+        self.active = active
+        self.count = count
+
 #--For Student_bot
 
 class Parallel(BaseModel):

@@ -21,6 +21,8 @@ db_append_status = ''  # статут добавления нового зада
 new_example: Example  # объект новое задание
 db_edit_status = ''  # статут изменения задания
 edit_example: Example  # объект изменяемого задания
+new_multi_dz_theme: Multi_dz_theme #объект тема для мульти дз
+new_multi_dz_themes = {} #справочник тем и кол-ва заданий для мульти дз
 new_dz_1t = {'класс': '',
              'тема': '',
              'кол-во заданий': '',
@@ -37,6 +39,11 @@ main_bd_markup.row('На главную')
 main_dz_markup = types.ReplyKeyboardMarkup(True)
 main_dz_markup.row('Задать ДЗ', 'Проверить ДЗ', 'Удалить ДЗ')
 main_dz_markup.row('На главную')
+#выбор типа ДЗ
+dz_markup = types.ReplyKeyboardMarkup(True)
+dz_markup.row('Одна тема', 'Мультитест', 'Назад')
+dz_markup.row('На главную')
+
 ##для студента
 # главная клавиатура
 main_student_markup = types.ReplyKeyboardMarkup(True)
@@ -78,8 +85,9 @@ def main(message):
     global new_dz_status
     if user_id == teacher:
         if message.text == 'На главную':
-            my_bot.send_message(user_id, 'Чем займемся?', reply_markup=main_page_markup)
             clearstatus()
+            my_bot.send_message(user_id, 'Чем займемся?', reply_markup=main_page_markup)
+
         if message.text == 'База заданий':
             my_bot.send_message(user_id, 'Выбери действие 👇', reply_markup=main_bd_markup)
         if message.text == 'Дополнить БД ОГЭ':  # запуск функции добавления заданий (шаг1)
@@ -107,7 +115,15 @@ def main(message):
             OGE_DB_EDIT1(user_id)
         elif message.text == 'Задать ДЗ':
             clearstatus()
+            my_bot.send_message(user_id, 'Какой тип ДЗ создать?👈', reply_markup=dz_markup)
+        elif message.text == 'Одна тема':
+            clearstatus()
             create_dz(message)
+        elif message.text == 'Мультитест':
+            clearstatus()
+            create_multi_dz(message)
+        elif message.text == 'Назад':
+            my_bot.send_message(user_id, 'Выбери действие 👇', reply_markup=main_dz_markup)
         elif message.text == 'Удалить ДЗ':
             clearstatus()
             dz_delete1(message)
@@ -172,9 +188,75 @@ def dz_delete3(call):
         DzTable.get(id=(call.data.split('_')[1])).delete_instance()
         my_bot.answer_callback_query(call.id, text="ДЗ удалено")
 
+# начало создания мульти-ДЗ, создание справочника тем и кол-ва заданий
+def create_multi_dz(message):
+    user_id = message.chat.id
+    global new_multi_dz_themes
+    global new_multi_dz_theme
+    for theme in Theme.select():
+        new_multi_dz_themes[theme.name] = Multi_dz_theme(tema=theme.name, active='no', count=0)
+    create_multi_dz_key(message)
+
+# формирование стартовой клавиатуры выбора заданий
+def create_multi_dz_key(message):
+    global new_multi_dz_themes
+    user_id = message.chat.id
+    multi_dz_theme = types.InlineKeyboardMarkup()
+    for theme in new_multi_dz_themes.values():
+        text = theme.tema
+        if theme.active == 'yes':
+            text+= '✅'
+        multi_dz_theme.row(types.InlineKeyboardButton(text=text,
+                                                               callback_data=f"append to multidz_{theme.tema}"))
+    multi_dz_theme.row(types.InlineKeyboardButton(text='Далее ➡️',
+                                                      callback_data=f"create_multi_dz2"))
+    my_bot.send_message(user_id, 'Темы для мульти ДЗ', reply_markup=multi_dz_theme)
 
 
+# обновление клавиатуры с отметкой выбранных тем
+@my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'append to multidz')
+def create_multi_dz2(call):
+    global new_multi_dz_themes
+    user_id = call.message.chat.id
+    if new_multi_dz_themes[call.data.split('_')[1]].active == 'no':
+        new_multi_dz_themes[call.data.split('_')[1]].active = 'yes'
+    else:
+        new_multi_dz_themes[call.data.split('_')[1]].active = 'no'
+    multi_dz_theme1 = types.InlineKeyboardMarkup()
+    for theme in new_multi_dz_themes.values():
+        text = theme.tema
+        if theme.active == 'yes':
+            text += '✅'
+        multi_dz_theme1.row(types.InlineKeyboardButton(text=text,
+                                                      callback_data=f"append to multidz_{theme.tema}"))
+    multi_dz_theme1.row(types.InlineKeyboardButton(text='Далее ➡️',
+                                                  callback_data=f"create_multi_dz2"))
 
+    my_bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                             text='Темы для мульти ДЗ',
+                             reply_markup=multi_dz_theme1)
+
+# def create_multi_dz(message):
+#     user_id = message.chat.id
+#     global new_multi_dz_themes
+#     new_multi_dz_themes = {}
+#     multi_dz_theme = types.InlineKeyboardMarkup()
+#     for theme in Theme.select():
+#         multi_dz_theme.row(types.InlineKeyboardButton(text=theme.name,
+#                                                       callback_data=f"append to multidz_{theme.id}"))
+#     my_bot.send_message(user_id, f'Темы для теста: {new_multi_dz_themes.keys()}', reply_markup=multi_dz_theme)
+#
+# #добавление тем и отображение на экране
+# @my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'append to multidz')
+# def create_multi_dz2(call):
+#     user_id = call.message.chat.id
+#     global new_multi_dz_themes
+#     new_multi_dz_themes[Theme.get(id=call.data.split('_')[1]).name] = 0
+#     multi_dz_theme = types.InlineKeyboardMarkup()
+#     for theme in Theme.select():
+#         multi_dz_theme.row(types.InlineKeyboardButton(text=theme.name,
+#                                                       callback_data=f"append to multidz_{theme.id}"))
+#     my_bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=f'Темы для теста: {new_multi_dz_themes.keys()}', reply_markup=multi_dz_theme)
 
 #начало проверки ДЗ, выбор класса
 def dz_check1(message):
@@ -473,6 +555,8 @@ def clearstatus():
     global db_append_status
     global new_dz_1t
     global new_dz_status
+    global new_multi_dz_themes
+    new_multi_dz_themes = {}
     db_edit_status = ''
     db_append_status = ''
     new_dz_1t = {'параллель': '',
