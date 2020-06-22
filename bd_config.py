@@ -141,8 +141,7 @@ def gen_numex_dz_1t(dz):
 # Klass.create_table()4
 # UserTab.drop_table()
 # UserTab.create_table()
-# DzTable.drop_table()
-# DzTable.create_table()
+#
 # Klass.create(name='8В', paral=Parallel.get(name='8') )
 # for i in range(7, 12):
 #     Parallel.create(name=i)
@@ -152,3 +151,5 @@ def gen_numex_dz_1t(dz):
 # SelfTest_1t.create_table()
 # SelfTest_1t_ex.drop_table()
 # SelfTest_1t_ex.create_table()
+# DzTable.drop_table()
+# DzTable.create_table()
