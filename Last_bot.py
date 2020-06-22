@@ -3,6 +3,9 @@ from telebot import apihelper, types
 from bd_config import *
 from datetime import datetime
 from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup
+from docx import Document
+import shutil
+
 
 from random import *
 
@@ -99,19 +102,6 @@ def main(message):
                 TestExample.id == edit_example.id).execute()
             my_bot.send_message(user_id, 'Ответ на задание изменен')
             clearstatus()
-        # elif message.text == 'БД':
-        #     sel = TestExample.select()
-        #     for ex in sel:
-        #         my_bot.send_message(user_id, f'Тема {Theme.get(id=ex.theme).name}/номер {ex.id}')
-        #         my_bot.send_photo(user_id, ex.photo)
-        #         my_bot.send_message(user_id, ex.answer)
-        # elif message.text == 'Посмотреть задания':
-        #     test_themes = Theme.select()
-        #     choice_theme_keyboard = types.InlineKeyboardMarkup()
-        #     for theme in test_themes:
-        #         choice_theme_keyboard.row(types.InlineKeyboardButton(text=theme.name,
-        #                                                              callback_data=f'theme view_{theme.name}'))
-        #     my_bot.send_message(user_id, 'Какую тему открыть для просмотра?', reply_markup=choice_theme_keyboard)
         elif message.text == 'Изменить задание':  # запуск функции изменения задания
             clearstatus()
             OGE_DB_EDIT1(user_id)
@@ -227,8 +217,40 @@ def dz_check2(call):
     for dz in Klass.get(name=call.data.split('_')[1]).dz_po_klassu:
         dz_klass_check.row(types.InlineKeyboardButton(
             text=f'от {dz.date_create.strftime("%d.%m")} по теме 📓 {dz.theme.name} 👉 {dz.name}',
-            callback_data=f"open dz_{dz.id}"))
+            callback_data=f"open dz_{dz.id}"),
+        types.InlineKeyboardButton(text='Выгрузить в файл',callback_data=f'download dz_{dz.id}'))
     my_bot.send_message(user_id, 'Какое ДЗ открыть?', reply_markup=dz_klass_check)
+
+
+@my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'download dz')
+def dz_download1(call):
+    user_id = call.message.chat.id
+    dz = DzTable.get(id=call.data.split('_')[1])
+    dz_otchet = dz.tests
+    shutil.copy2('shablon.docx', 'otchet_dz.docx')
+    #f = open('otchet_dz.docx','rb')
+    doc = Document('otchet_dz.docx')
+    # doc = Document()
+    doc.add_heading(f'{dz.name} от {dz.date_create.strftime("%H:%M - %d.%m")} по теме {dz.theme.name}', 1)
+    for userdz in dz_otchet:
+        doc.add_heading(f'{str(userdz.user.name).ljust(20," ")} верно {str(userdz.right_count).rjust(2," ")} из {str(userdz.ex_count).rjust(2," ")} выполнение {userdz.date_start.strftime("%H:%M")}-{userdz.date_finish.strftime("%H:%M / %d.%m")}', 1)
+        for test in userdz.tests_ex:
+            if test.right == 'True':
+                text1 = 'Верно ✅'
+            else:
+                text1 = 'Неверно ❌'
+            doc.add_heading(text1, 2)
+            file_info = my_bot.get_file(test.test_ex_id.photo)
+            downloadfile = my_bot.download_file(file_info.file_path)
+            src = 'D:/Oge test bot 2.0/documents/' + '123.jpg'
+            with open(src, 'wb') as new_file:
+                new_file.write(downloadfile)
+            doc.add_picture('D:/Oge test bot 2.0/documents/123.jpg')
+
+    doc.save('otchet_dz.docx')
+    f = open('otchet_dz.docx', "rb")
+    my_bot.send_document(user_id, f)
+    print('выгрузка закончена')
 
 #Продолжение проверки ДЗ, выбор конкретного теста юзера
 @my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'open dz')
@@ -410,8 +432,12 @@ def main(message):
         global new_example
         global edit_example
         user_id = message.chat.id
+        # if db_append_status == 'ожидание фото':  # добавление заданий, шаг4, получили фото, ждем ответа
+        #     new_example.photo = message.photo[0].file_id
+        #     my_bot.send_message(user_id, 'Введите ответ на задание')
+        #     db_append_status = 'ожидание ответа'
         if db_append_status == 'ожидание фото':  # добавление заданий, шаг4, получили фото, ждем ответа
-            new_example.photo = message.photo[0].file_id
+            new_example.photo = message.photo[len(message.photo) - 1].file_id
             my_bot.send_message(user_id, 'Введите ответ на задание')
             db_append_status = 'ожидание ответа'
         elif db_edit_status == 'ожидание нового фото':  # запись нового фото в бд
@@ -489,23 +515,6 @@ def user_function(message):
                                                callback_data='check_dz'))
     my_bot.send_message(user_id, 'Чем займемся?', reply_markup=choice_func)
 
-
-# #старт ДЗ - выбор ДЗ из списка
-# @my_bot.callback_query_handler(func=lambda call: call.data == 'check_dz')
-# def choice_theme_selftest_1t(call):
-#     user_id = call.message.chat.id
-#     choice_dz = types.InlineKeyboardMarkup()
-#     for dz in UserTab.get(teleg_id=user_id).klass.paral.dz_po_parallel.select():
-#         if DzTable.get(id=dz.id).tests.select().where(
-#                 SelfTest_1t.user == UserTab.get(teleg_id=user_id)).count() == 0:
-#             status_dz = 'не выполнено ❌'
-#         else:
-#             status_dz = 'выполнено ✅'
-#         choice_dz.row(types.InlineKeyboardButton(text=f'{dz.name} - {status_dz}',
-#                                                    callback_data=f'choice {dz.id}'))
-#     my_bot.send_message(user_id, 'Какое ДЗ открыть? ❓', reply_markup=choice_dz)
-
-    #------------------
 
 #дубль два
 @my_bot.callback_query_handler(func=lambda call: call.data == 'check_dz')
