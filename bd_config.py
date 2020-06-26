@@ -72,6 +72,7 @@ class UserTab(BaseModel):
     reg_date = DateTimeField()
     reg_status = CharField()
     status = CharField()
+    cur_multitest = IntegerField()
 
 
 class DzTable(BaseModel):
@@ -80,6 +81,14 @@ class DzTable(BaseModel):
     theme = ForeignKeyField(Theme, backref='dz_po_teme')
     count = IntegerField()
     name = CharField()
+    date_create = DateTimeField()
+
+
+class MultiDzTable(BaseModel):
+    id = AutoField()
+    klass = ForeignKeyField(Klass, backref='multidz_po_klassu')
+    name = CharField()
+    zadanie = CharField()
     date_create = DateTimeField()
 
 
@@ -96,12 +105,26 @@ class SelfTest_1t(BaseModel):
     dz_id = ForeignKeyField(DzTable, backref='tests')
 
 
+class MultiTest(BaseModel):
+    id = AutoField()
+    multidz_id = ForeignKeyField(MultiDzTable, backref='tests')
+    user = ForeignKeyField(UserTab, backref='multitests')
+    ex_data = CharField()
+    ex_count = IntegerField()
+    done_ex_count = IntegerField()
+    right_count = IntegerField()
+    date_start = DateTimeField()
+    date_finish = DateTimeField()
+
+
 class SelfTest_1t_ex(BaseModel):
-    test_id = ForeignKeyField(SelfTest_1t, backref='tests_ex')
+    test_id = ForeignKeyField(SelfTest_1t, backref='tests_ex', null=True)
     test_ex_id = ForeignKeyField(TestExample, backref='selftets_1t')
     user_answer = CharField()
     right = CharField()
     date = DateField()
+    multitest_id = ForeignKeyField(MultiTest, backref='tests_ex', null=False)
+
 
 
 
@@ -135,6 +158,27 @@ def gen_numex_dz_1t(dz):
     exam_dz = random.sample(ex_n_dz, dz.count)
     return exam_dz
 
+
+def gen_numex_multi_dz(zadanie):
+    ex_data = []
+    for part in zadanie.split(';'):
+        ex_data_part = []
+        part_ex = Theme.get(name=part.split('_')[0]).examples
+        for ex in part_ex:
+            ex_data_part.append(ex.id)
+        ex_data += random.sample(ex_data_part, int(part.split('_')[1]))
+        print(ex_data)
+    return ex_data
+
+def multidz_count_sum(zadanie):
+    count_sum = 0
+    print('считаем')
+    for part in zadanie.split(';'):
+        count_sum += int(part.split('_')[1])
+    print(count_sum, 'заданий')
+    return count_sum
+
+
 # user_id = 646951760
 # mas = UserTab.get(teleg_id=user_id).tests[-1].ex_data
 # print(mas)
@@ -163,3 +207,7 @@ def gen_numex_dz_1t(dz):
 # SelfTest_1t_ex.create_table()
 # DzTable.drop_table()
 # DzTable.create_table()
+# MultiDzTable.drop_table()
+# MultiDzTable.create_table()
+# MultiTest.drop_table()
+# MultiTest.create_table()

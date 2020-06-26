@@ -6,11 +6,10 @@ from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup
 from docx import Document
 import shutil
 
-
 from random import *
 
-apihelper.proxy = {'https': 'socks5://190737618:TsT9nZls@orbtl.s5.opennetwork.cc:999'} #работал до 29 мая
-#apihelper.proxy = {'https': 'socks5://185.161.211.25:1080'}
+apihelper.proxy = {'https': 'socks5://190737618:TsT9nZls@orbtl.s5.opennetwork.cc:999'}  # работал до 29 мая
+# apihelper.proxy = {'https': 'socks5://185.161.211.25:1080'}
 my_bot = telebot.TeleBot('1245059539:AAGqbmMsH9bQu6-e3RjkYmCblt9vbKCvf2Y')
 init_db()
 
@@ -21,13 +20,15 @@ db_append_status = ''  # статут добавления нового зада
 new_example: Example  # объект новое задание
 db_edit_status = ''  # статут изменения задания
 edit_example: Example  # объект изменяемого задания
-new_multi_dz_theme: Multi_dz_theme #объект тема для мульти дз
-new_multi_dz_themes = {} #справочник тем и кол-ва заданий для мульти дз
+new_multi_dz_theme: Multi_dz_theme  # объект тема для мульти дз
+new_multi_dz_themes = {}  # справочник тем и кол-ва заданий для мульти дз С ПУСТЫМИ ТЕМАМИ
+new_multi_dz = ''  # справочник тем и кол-ва заданий для мульти дз БЕЗ ПУСТЫХ ТЕМ
 new_dz_1t = {'класс': '',
              'тема': '',
              'кол-во заданий': '',
-             'название': ''} # объект нового дз, которое еще не занесено в бд
+             'название': ''}  # объект нового дз, которое еще не занесено в бд
 new_dz_status = ''  # статус добавления нового дз
+new_multi_dz_status = ''
 # главная клавиатура
 main_page_markup = types.ReplyKeyboardMarkup(True)
 main_page_markup.row('База заданий', 'Работа с ДЗ')
@@ -39,7 +40,7 @@ main_bd_markup.row('На главную')
 main_dz_markup = types.ReplyKeyboardMarkup(True)
 main_dz_markup.row('Задать ДЗ', 'Проверить ДЗ', 'Удалить ДЗ')
 main_dz_markup.row('На главную')
-#выбор типа ДЗ
+# выбор типа ДЗ
 dz_markup = types.ReplyKeyboardMarkup(True)
 dz_markup.row('Одна тема', 'Мультитест', 'Назад')
 dz_markup.row('На главную')
@@ -53,11 +54,11 @@ main_student_markup.row('На главную')
 @my_bot.message_handler(commands=['start'])
 def start_message(message):
     user_id = str(message.from_user.id)
-    #интерфейс учителя---------------------------------------------------
+    # интерфейс учителя---------------------------------------------------
     if user_id == teacher:
         my_bot.send_message(user_id, 'Привет, создатель!', reply_markup=main_page_markup)
         my_bot.send_message(user_id, 'Чем займемся?')
-    #интерфейс пользователя---------------------------------------------
+    # интерфейс пользователя---------------------------------------------
     else:
         if UserTab.select().where(UserTab.teleg_id == user_id).count() == 0:
             UserTab.create(teleg_id=user_id,
@@ -66,7 +67,8 @@ def start_message(message):
                            cur_selftest_1t='нет',
                            reg_status='Нет фио',
                            reg_date=datetime.now(),
-                           status='')
+                           status='',
+                           cur_multitest='нет')
         if UserTab.get(teleg_id=user_id).reg_status == 'Нет фио':
             my_bot.send_message(user_id, 'Привет🖐, давай тебя зарегистрируем в системе.')
             my_bot.send_message(user_id, 'Введи свои Фамилию и Имя (Например, Иванов Пётр)')
@@ -135,18 +137,25 @@ def main(message):
             new_dz_1t['кол-во заданий'] = int(message.text)
             my_bot.send_message(user_id, 'Введите название ДЗ')
         elif new_dz_status == 'название дз':
-            #new_dz_status = 'название дз'
+            # new_dz_status = 'название дз'
             new_dz_1t['название'] = message.text
             create_dz_finish(message)
-            #my_bot.send_message(user_id, 'Введите название ДЗ')
+            # my_bot.send_message(user_id, 'Введите название ДЗ')
 
         elif message.text == 'Проверить ДЗ':
             clearstatus()
             dz_check1(message)
 
+        elif new_multi_dz_status == 'жду названия мультидз':
+            kl, zd = new_multi_dz.split('/')
+            MultiDzTable.create(klass=Klass.get(name=kl),
+                                name=message.text, zadanie=zd, date_create=datetime.now())
+            my_bot.send_message(user_id, f'МультиДЗ для {kl} создано 👍')
+            clearstatus()
 
 
-   #для студента--------------------------------------------------------------------
+
+    # для студента--------------------------------------------------------------------
     else:
         if UserTab.select().where(UserTab.teleg_id == user_id).count() == 0:
             my_bot.send_message(user_id, 'Вы не зарегистрированы. Напишите команду /start')
@@ -163,15 +172,20 @@ def main(message):
                 start_selftest_1t(message)
             elif UserTab.get(teleg_id=user_id).status == 'тест 1т в процессе':
                 do_selftest_1t(message)
+            if UserTab.get(teleg_id=user_id).status == 'мультитест старт':
+                start_multitest(message)
+            elif UserTab.get(teleg_id=user_id).status == 'мультитест в процессе':
+                do_multitest(message)
 
 ##для учителя------------------------------------------------------------------------
-#удалени ДЗ, выбор дз из общего списка для удаления
+# удалени ДЗ, выбор дз из общего списка для удаления
 def dz_delete1(message):
     user_id = message.chat.id
     dz_del_key = InlineKeyboardMarkup()
     for dz in DzTable.select()[::-1]:
-        dz_del_key.row(types.InlineKeyboardButton(text=f'{dz.name} для {dz.klass.name} от {dz.date_create.strftime("%H:%M - %d.%m")}',
-                                                  callback_data=f'del dz_{dz.id}'))
+        dz_del_key.row(types.InlineKeyboardButton(
+            text=f'{dz.name} для {dz.klass.name} от {dz.date_create.strftime("%H:%M - %d.%m")}',
+            callback_data=f'del dz_{dz.id}'))
     my_bot.send_message(user_id, 'Какое ДЗ удалить?', reply_markup=dz_del_key)
 
 
@@ -180,13 +194,15 @@ def dz_delete2(call):
     user_id = call.message.chat.id
     del_dz_keyboard = types.InlineKeyboardMarkup()
     del_dz_keyboard.row(types.InlineKeyboardButton(text='Да',
-                                                      callback_data=f"del dz1_{call.data.split('_')[1]}"))
+                                                   callback_data=f"del dz1_{call.data.split('_')[1]}"))
     my_bot.send_message(user_id, 'Уверены, что хотите удалить это ДЗ?', reply_markup=del_dz_keyboard)
+
 
 @my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'del dz1')
 def dz_delete3(call):
-        DzTable.get(id=(call.data.split('_')[1])).delete_instance()
-        my_bot.answer_callback_query(call.id, text="ДЗ удалено")
+    DzTable.get(id=(call.data.split('_')[1])).delete_instance()
+    my_bot.answer_callback_query(call.id, text="ДЗ удалено")
+
 
 # начало создания мульти-ДЗ, создание справочника тем и кол-ва заданий
 def create_multi_dz(message):
@@ -197,6 +213,7 @@ def create_multi_dz(message):
         new_multi_dz_themes[theme.name] = Multi_dz_theme(tema=theme.name, active='no', count=0)
     create_multi_dz_key(message)
 
+
 # формирование стартовой клавиатуры выбора заданий
 def create_multi_dz_key(message):
     global new_multi_dz_themes
@@ -205,12 +222,12 @@ def create_multi_dz_key(message):
     for theme in new_multi_dz_themes.values():
         text = theme.tema
         if theme.active == 'yes':
-            text+= '✅'
+            text += '✅'
         multi_dz_theme.row(types.InlineKeyboardButton(text=text,
-                                                               callback_data=f"append to multidz_{theme.tema}"))
+                                                      callback_data=f"append to multidz_{theme.tema}"))
     multi_dz_theme.row(types.InlineKeyboardButton(text='Далее ➡️',
-                                                      callback_data=f"create_multi_dz2"))
-    my_bot.send_message(user_id, 'Темы для мульти ДЗ', reply_markup=multi_dz_theme)
+                                                  callback_data=f"create_multi_dz2"))
+    my_bot.send_message(user_id, 'Выберите темы для мульти ДЗ 👇', reply_markup=multi_dz_theme)
 
 
 # обновление клавиатуры с отметкой выбранных тем
@@ -222,47 +239,124 @@ def create_multi_dz2(call):
         new_multi_dz_themes[call.data.split('_')[1]].active = 'yes'
     else:
         new_multi_dz_themes[call.data.split('_')[1]].active = 'no'
+        new_multi_dz_themes[call.data.split('_')[1]].count = 0
+    multi_dz_keyboard(call)  # вызов клавиатуры с выбором тем и кол-ва заданий
+
+
+# обновление клавиатуры с отметкой выбранных тем
+@my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'multdz count')
+def create_multi_dz2(call):
+    global new_multi_dz_themes
+    user_id = call.message.chat.id
+    new_multi_dz_themes[call.data.split('_')[1]].count = int(call.data.split('_')[2])
+    multi_dz_keyboard(call)
+
+
+def multi_dz_keyboard(call):
     multi_dz_theme1 = types.InlineKeyboardMarkup()
     for theme in new_multi_dz_themes.values():
         text = theme.tema
         if theme.active == 'yes':
             text += '✅'
+            if theme.count > 0:
+                text += f'👉 {theme.count}'
         multi_dz_theme1.row(types.InlineKeyboardButton(text=text,
-                                                      callback_data=f"append to multidz_{theme.tema}"))
+                                                       callback_data=f"append to multidz_{theme.tema}"))
+
+        # кнопки кол-ва заданий
+        if theme.active == 'yes' and theme.count == 0:
+            multi_dz_theme1.row(types.InlineKeyboardButton(text=1,
+                                                           callback_data=f"multdz count_{theme.tema}_1"),
+                                types.InlineKeyboardButton(text=2,
+                                                           callback_data=f"multdz count_{theme.tema}_2"),
+                                types.InlineKeyboardButton(text=3,
+                                                           callback_data=f"multdz count_{theme.tema}_3"),
+                                types.InlineKeyboardButton(text=4,
+                                                           callback_data=f"multdz count_{theme.tema}_4"),
+                                types.InlineKeyboardButton(text=5,
+                                                           callback_data=f"multdz count_{theme.tema}_5"))
+            multi_dz_theme1.row(types.InlineKeyboardButton(text=6,
+                                                           callback_data=f"multdz count_{theme.tema}_6"),
+                                types.InlineKeyboardButton(text=7,
+                                                           callback_data=f"multdz count_{theme.tema}_7"),
+                                types.InlineKeyboardButton(text=8,
+                                                           callback_data=f"multdz count_{theme.tema}_8"),
+                                types.InlineKeyboardButton(text=9,
+                                                           callback_data=f"multdz count_{theme.tema}_9"),
+                                types.InlineKeyboardButton(text=10,
+                                                           callback_data=f"multdz count_{theme.tema}_10"))
+
     multi_dz_theme1.row(types.InlineKeyboardButton(text='Далее ➡️',
-                                                  callback_data=f"create_multi_dz2"))
+                                                   callback_data=f"create_multi_dz2"))
 
     my_bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
-                             text='Темы для мульти ДЗ',
+                             text='Выберите темы для мульти ДЗ 👇',
                              reply_markup=multi_dz_theme1)
 
-# def create_multi_dz(message):
-#     user_id = message.chat.id
-#     global new_multi_dz_themes
-#     new_multi_dz_themes = {}
-#     multi_dz_theme = types.InlineKeyboardMarkup()
-#     for theme in Theme.select():
-#         multi_dz_theme.row(types.InlineKeyboardButton(text=theme.name,
-#                                                       callback_data=f"append to multidz_{theme.id}"))
-#     my_bot.send_message(user_id, f'Темы для теста: {new_multi_dz_themes.keys()}', reply_markup=multi_dz_theme)
-#
-# #добавление тем и отображение на экране
-# @my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'append to multidz')
-# def create_multi_dz2(call):
-#     user_id = call.message.chat.id
-#     global new_multi_dz_themes
-#     new_multi_dz_themes[Theme.get(id=call.data.split('_')[1]).name] = 0
-#     multi_dz_theme = types.InlineKeyboardMarkup()
-#     for theme in Theme.select():
-#         multi_dz_theme.row(types.InlineKeyboardButton(text=theme.name,
-#                                                       callback_data=f"append to multidz_{theme.id}"))
-#     my_bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=f'Темы для теста: {new_multi_dz_themes.keys()}', reply_markup=multi_dz_theme)
 
-#начало проверки ДЗ, выбор класса
+# создание строки с темами и кол-вом заданийб изменение статуса мультидз
+@my_bot.callback_query_handler(func=lambda call: call.data == 'create_multi_dz2')
+def create_multi_dz2(call):
+    global new_multi_dz_themes
+    global new_multi_dz
+    global new_multi_dz_status
+    z = ''
+    user_id = call.message.chat.id
+    for theme in new_multi_dz_themes.values():
+        if theme.active == 'yes' and theme.count > 0:
+            if new_multi_dz != '':
+                z = ';'
+            new_multi_dz += f'{z}{theme.tema}_{theme.count}'
+
+    # формирование клавы выбора класса
+    user_id = call.message.chat.id
+    dz_klass_key = InlineKeyboardMarkup()
+    # все классы из 7 параллели
+    p7 = []
+    for kl in Parallel.get(name='7').classes:
+        p7.append(InlineKeyboardButton(text=kl.name, callback_data=f"create multi dz3_{kl.name}"))
+    dz_klass_key.row(*p7)
+    # 8 параллель
+    p8 = []
+    for kl in Parallel.get(name='8').classes:
+        p8.append(InlineKeyboardButton(text=kl.name, callback_data=f"create multi dz3_{kl.name}"))
+    dz_klass_key.row(*p8)
+    # 9 параллель
+    p9 = []
+    for kl in Parallel.get(name='9').classes:
+        p9.append(InlineKeyboardButton(text=kl.name, callback_data=f"create multi dz3_{kl.name}"))
+    dz_klass_key.row(*p9)
+    # 10 параллель
+    p10 = []
+    for kl in Parallel.get(name='10').classes:
+        p10.append(InlineKeyboardButton(text=kl.name, callback_data=f"create multi dz3_{kl.name}"))
+    dz_klass_key.row(*p10)
+    # 11 параллель
+    p11 = []
+    for kl in Parallel.get(name='11').classes:
+        p11.append(InlineKeyboardButton(text=kl.name, callback_data=f"create multi dz3_{kl.name}"))
+    dz_klass_key.row(*p11)
+    # вывод на кран клавы с классами
+    my_bot.send_message(user_id, 'Для какого класса задать МультиДЗ? 👇', reply_markup=dz_klass_key)
+
+
+# создание строки с темами и кол-вом заданийб изменение статуса мультидз
+@my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'create multi dz3')
+def create_multi_dz2(call):
+    global new_multi_dz_themes
+    global new_multi_dz
+    global new_multi_dz_status
+    user_id = call.message.chat.id
+    new_multi_dz = f"{call.data.split('_')[1]}/{new_multi_dz}"
+    new_multi_dz_status = 'жду названия мультидз'
+    my_bot.send_message(user_id, "Введите название для мультиДЗ 👇")
+
+
+# начало проверки ДЗ, выбор класса
 def dz_check1(message):
     user_id = message.chat.id
     dz_klass_key = InlineKeyboardMarkup()
-    #все классы из 7 параллели
+    # все классы из 7 параллели
     p7 = []
     for kl in Parallel.get(name='7').classes:
         p7.append(InlineKeyboardButton(text=kl.name, callback_data=f"dz check_{kl.name}"))
@@ -287,20 +381,21 @@ def dz_check1(message):
     for kl in Parallel.get(name='11').classes:
         p11.append(InlineKeyboardButton(text=kl.name, callback_data=f"dz check_{kl.name}"))
     dz_klass_key.row(*p11)
-    #вывод на кран клавы с классами
+    # вывод на кран клавы с классами
     my_bot.send_message(user_id, 'Какой класс открыть?', reply_markup=dz_klass_key)
 
-#Продолжение проверки ДЗ, выбор ДЗ
+
+# Продолжение проверки ДЗ, выбор ДЗ
 @my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'dz check')
 def dz_check2(call):
     user_id = call.message.chat.id
-    #вывод всех дз по параллели
+    # вывод всех дз по параллели
     dz_klass_check = types.InlineKeyboardMarkup()
     for dz in Klass.get(name=call.data.split('_')[1]).dz_po_klassu:
         dz_klass_check.row(types.InlineKeyboardButton(
             text=f'от {dz.date_create.strftime("%d.%m")} по теме 📓 {dz.theme.name} 👉 {dz.name}',
             callback_data=f"open dz_{dz.id}"),
-        types.InlineKeyboardButton(text='Выгрузить в файл',callback_data=f'download dz_{dz.id}'))
+            types.InlineKeyboardButton(text='Выгрузить в файл', callback_data=f'download dz_{dz.id}'))
     my_bot.send_message(user_id, 'Какое ДЗ открыть?', reply_markup=dz_klass_check)
 
 
@@ -310,12 +405,14 @@ def dz_download1(call):
     dz = DzTable.get(id=call.data.split('_')[1])
     dz_otchet = dz.tests
     shutil.copy2('shablon.docx', 'otchet_dz.docx')
-    #f = open('otchet_dz.docx','rb')
+    # f = open('otchet_dz.docx','rb')
     doc = Document('otchet_dz.docx')
     # doc = Document()
     doc.add_heading(f'{dz.name} от {dz.date_create.strftime("%H:%M - %d.%m")} по теме {dz.theme.name}', 1)
     for userdz in dz_otchet:
-        doc.add_heading(f'{str(userdz.user.name).ljust(20," ")} верно {str(userdz.right_count).rjust(2," ")} из {str(userdz.ex_count).rjust(2," ")} выполнение {userdz.date_start.strftime("%H:%M")}-{userdz.date_finish.strftime("%H:%M / %d.%m")}', 1)
+        doc.add_heading(
+            f'{str(userdz.user.name).ljust(20, " ")} верно {str(userdz.right_count).rjust(2, " ")} из {str(userdz.ex_count).rjust(2, " ")} выполнение {userdz.date_start.strftime("%H:%M")}-{userdz.date_finish.strftime("%H:%M / %d.%m")}',
+            1)
         for test in userdz.tests_ex:
             if test.right == 'True':
                 text1 = 'Верно ✅'
@@ -334,14 +431,15 @@ def dz_download1(call):
     my_bot.send_document(user_id, f)
     print('выгрузка закончена')
 
-#Продолжение проверки ДЗ, выбор конкретного теста юзера
+
+# Продолжение проверки ДЗ, выбор конкретного теста юзера
 @my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'open dz')
 def dz_check3(call):
     user_id = call.message.chat.id
     dz_user_check = types.InlineKeyboardMarkup()
     for dz in DzTable.get(id=call.data.split('_')[1]).tests.select().order_by(SelfTest_1t.user):
         dz_user_check.row(types.InlineKeyboardButton(
-        text= f'{str(dz.user.name).ljust(20,"=")} верно {str(dz.right_count).rjust(2," ")} из {str(dz.ex_count).rjust(2," ")} \n {dz.date_start.strftime("%H:%M - %d.%m")}/{dz.date_finish.strftime("%H:%M - %d.%m")}',
+            text=f'{str(dz.user.name).ljust(20, "=")} верно {str(dz.right_count).rjust(2, " ")} из {str(dz.ex_count).rjust(2, " ")} \n {dz.date_start.strftime("%H:%M - %d.%m")}/{dz.date_finish.strftime("%H:%M - %d.%m")}',
             callback_data=f"open user dz_{dz.id}"))
     my_bot.send_message(user_id, 'Какой тест открыть??', reply_markup=dz_user_check)
 
@@ -358,7 +456,8 @@ def dz_check3(call):
         my_bot.send_photo(user_id, ex.test_ex_id.photo)
         my_bot.send_message(user_id, f"Ответ юзера: {ex.user_answer} {text}")
 
-#начало создания нового дз по 1 теме на класс
+
+# начало создания нового дз по 1 теме на класс
 def create_dz(message):
     user_id = message.chat.id
     dz_klass_key = InlineKeyboardMarkup()
@@ -391,9 +490,7 @@ def create_dz(message):
     my_bot.send_message(user_id, 'Какой класс открыть?', reply_markup=dz_klass_key)
 
 
-
-
-#выбор темы дз
+# выбор темы дз
 @my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'dz new')
 def create_dz_2(call):
     user_id = call.message.chat.id
@@ -402,10 +499,11 @@ def create_dz_2(call):
     dz_theme_key = types.InlineKeyboardMarkup()
     for theme in Theme.select():
         dz_theme_key.row(types.InlineKeyboardButton(text=theme.name,
-                                                             callback_data=f'choise new dz theme_{theme}'))
+                                                    callback_data=f'choise new dz theme_{theme}'))
     my_bot.send_message(user_id, 'По какой теме ДЗ?', reply_markup=dz_theme_key)
 
-#выбор кол-ва зазаний в дз
+
+# выбор кол-ва зазаний в дз
 @my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'choise new dz theme')
 def create_dz_3(call):
     user_id = call.message.chat.id
@@ -413,8 +511,10 @@ def create_dz_3(call):
     global new_dz_status
     new_dz_1t['тема'] = call.data.split('_')[1]
     new_dz_status = 'кол-во заданий'
-    my_bot.send_message(user_id, f"Заданий по выбранной теме - {TestExample.select().where(TestExample.theme == new_dz_1t['тема']).count()}")
+    my_bot.send_message(user_id,
+                        f"Заданий по выбранной теме - {TestExample.select().where(TestExample.theme == new_dz_1t['тема']).count()}")
     my_bot.send_message(user_id, 'Кол-во заданий в ДЗ?')
+
 
 def create_dz_finish(message):
     user_id = message.chat.id
@@ -461,14 +561,16 @@ def OGE_DB_DEL1(call):
     user_id = call.message.chat.id
     del_test_keyboard = types.InlineKeyboardMarkup()
     del_test_keyboard.row(types.InlineKeyboardButton(text='Да',
-                                                      callback_data=f"delete test1_{call.data.split('_')[1]}"))
+                                                     callback_data=f"delete test1_{call.data.split('_')[1]}"))
     my_bot.send_message(user_id, 'Уверены, что хотите удалить это задание?', reply_markup=del_test_keyboard)
+
 
 @my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'delete test1')
 def OGE_DB_DEL2(call):
-        # user_id = call.message.chat.id
-        TestExample.get(id=(call.data.split('_')[1])).delete_instance()
-        my_bot.answer_callback_query(call.id, text="Задание удалено")
+    # user_id = call.message.chat.id
+    TestExample.get(id=(call.data.split('_')[1])).delete_instance()
+    my_bot.answer_callback_query(call.id, text="Задание удалено")
+
 
 # изменение существующего задания выбор нового фото или овтета (шаг4)
 @my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'edit test')
@@ -556,6 +658,8 @@ def clearstatus():
     global new_dz_1t
     global new_dz_status
     global new_multi_dz_themes
+    global new_multi_dz_status
+    global new_multi_dz
     new_multi_dz_themes = {}
     db_edit_status = ''
     db_append_status = ''
@@ -564,6 +668,8 @@ def clearstatus():
                  'кол-во заданий': '',
                  'название': ''}
     new_dz_status = ''
+    new_multi_dz_status = ''
+    new_multi_dz = ''
 
 
 ##для ученика-------------------------------------------------------------------------
@@ -597,48 +703,201 @@ def user_function(message):
                                                callback_data='start_selftest_1t'))
     choice_func.row(types.InlineKeyboardButton(text='Выполнить ДЗ',
                                                callback_data='check_dz'))
+    choice_func.row(types.InlineKeyboardButton(text='Выполнить МультиДЗ',
+                                               callback_data='check_multi_dz'))
     my_bot.send_message(user_id, 'Чем займемся?', reply_markup=choice_func)
 
 
-#дубль два
+# проверка наличия и выполнения МультиДЗ ----------------------------------------
+@my_bot.callback_query_handler(func=lambda call: call.data == 'check_multi_dz')
+def user_check_multi_dz(call):
+    user_id = call.message.chat.id
+    choice_dz = types.InlineKeyboardMarkup()
+    mass_mult_dz = UserTab.get(teleg_id=user_id).klass.multidz_po_klassu.select()
+    if len(mass_mult_dz) > 4:
+        r = 5
+    else:
+        r = len(mass_mult_dz) + 1
+    for i in range(1, r):
+        z1 = mass_mult_dz[-i]
+        if MultiDzTable.get(id=z1.id).tests.select().where(
+                MultiTest.user == UserTab.get(teleg_id=user_id)).count() == 0:
+            status_dz = 'не выполнено ❌'
+        else:
+            status_dz = 'выполнено ✅'
+        choice_dz.row(types.InlineKeyboardButton(text=f'{z1.name} - {status_dz}', callback_data=f'choice multidz_{z1.id}'))
+    my_bot.send_message(user_id, 'Какое Мульти-ДЗ открыть? ❓', reply_markup=choice_dz)
+
+
+# создание мультитеста дз по шаблону и запуск теста
+@my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'choice multidz')
+def create_multi_dz1(call):
+    print('---1')
+    dz = MultiDzTable.get(id=call.data.split('_')[1])
+    print('---2')
+    user_id = call.message.chat.id
+    print(dz.zadanie)
+    tid_dz = MultiTest.create(multidz_id=dz.id,
+                                user=UserTab.get(teleg_id=user_id),
+                                ex_data=gen_numex_multi_dz(dz.zadanie),
+                                ex_count=multidz_count_sum(dz.zadanie),
+                                done_ex_count=0,
+                                right_count=0,
+                                date_start=datetime.now(),
+                                date_finish='').id
+    print('---3')
+    UserTab.update({UserTab.cur_multitest: tid_dz}).where(UserTab.teleg_id == user_id).execute()
+    UserTab.update({UserTab.status: 'мультитест старт'}).where(UserTab.teleg_id == user_id).execute()
+    print('---4')
+    start_multitest(call.message)
+
+def start_multitest(message):
+    user_id = message.chat.id
+    ex_id = UserTab.get(teleg_id=user_id).multitests[-1].ex_data[1:-1].split(', ') #срезом убирает квадратные скобки и сплитуем
+    my_bot.send_message(user_id, f'Заданий осталось {len(ex_id)}')
+    my_bot.send_photo(user_id, TestExample.get(id=ex_id[0]).photo)
+
+    propusk_theme_selftest_1t = types.InlineKeyboardMarkup()
+    propusk_theme_selftest_1t.row(types.InlineKeyboardButton(text='Пропустить задание',
+                                                             callback_data='propusk_multitest'))
+
+    my_bot.send_message(user_id, 'Введите ваш ответ', reply_markup=propusk_theme_selftest_1t)
+    UserTab.update({UserTab.status: 'мультитест в процессе'}).where(UserTab.teleg_id == user_id).execute()
+
+
+@my_bot.callback_query_handler(func=lambda call: call.data == 'propusk_multitest')
+def call_propusk_multitest(call):
+    user_id = call.message.chat.id
+    UserTab.update({UserTab.status: 'мультитест старт'}).where(UserTab.teleg_id == user_id).execute()
+    multitest_sdvig(user_id)
+    start_multitest(call.message)
+
+
+def do_multitest(message):
+    ex_id = []
+    user_id = message.chat.id
+    ex_id = UserTab.get(teleg_id=user_id).multitests[-1].ex_data[1:-1].split(', ')
+    print('список заданий - ', UserTab.get(teleg_id=user_id).multitests[-1].ex_data[1:-1].split(', '))
+    # пока кол-во выполненых заданий меньше общего кол-ва заданий в тесте
+    if UserTab.get(teleg_id=user_id).multitests[-1].done_ex_count < UserTab.get(teleg_id=user_id).multitests[-1].ex_count:
+        # проверяем правильность ответа
+        print('ответ юзера ', message.text)
+        print('верный ответ ', TestExample.get(id=ex_id[0]).answer)
+        if TestExample.get(id=ex_id[0]).answer == message.text.upper():
+            ranswer = 'True'
+            print('ответ верен-1')
+            MultiTest.update({MultiTest.right_count: MultiTest.right_count + 1}).where(
+                MultiTest.id == UserTab.get(teleg_id=user_id).cur_multitest).execute()
+        else:
+            ranswer = 'False'
+            print('ответ неверен')
+        MultiTest.update({MultiTest.done_ex_count: MultiTest.done_ex_count + 1}).where(
+            MultiTest.id == UserTab.get(teleg_id=user_id).cur_multitest).execute()
+        # создаем запись о задании в БД
+        test_id = UserTab.get(teleg_id=user_id).cur_multitest
+        SelfTest_1t_ex.create(test_ex_id=TestExample.get(id=ex_id[0]),
+                              user_answer=message.text,
+                              right=ranswer,
+                              date=datetime.now(),
+                              multitest_id=UserTab.get(teleg_id=user_id).cur_multitest)
+        print('запись строки задания')
+        # сдвиг номер задания
+        ex_id = multitest_sdvig_del(user_id)
+        # выдаем следующее задание
+        print('список заданий new - ', UserTab.get(teleg_id=user_id).multitests[-1].ex_data[1:-1].split(', '))
+        if UserTab.get(teleg_id=user_id).multitests[-1].done_ex_count < UserTab.get(teleg_id=user_id).multitests[-1].ex_count:
+            my_bot.send_message(user_id, f'Заданий осталось {len(ex_id)}')
+            my_bot.send_photo(user_id, TestExample.get(id=ex_id[0]).photo)
+            print('верный ответ на задание ', TestExample.get(id=ex_id[0]).answer)
+            propusk_theme_selftest_1t = types.InlineKeyboardMarkup()
+            propusk_theme_selftest_1t.row(types.InlineKeyboardButton(text='Пропустить задание',
+                                                                     callback_data='propusk_multitest'))
+
+            my_bot.send_message(user_id, 'Введите ваш ответ', reply_markup=propusk_theme_selftest_1t)
+        else:
+            my_bot.send_message(user_id, 'Тест закончен')
+            MultiTest.update(date_finish=datetime.now()).where(
+                MultiTest.id == UserTab.get(teleg_id=user_id).cur_multitest).execute()
+            my_bot.send_message(user_id,
+                                f'Результат {MultiTest.get(id=UserTab.get(teleg_id=user_id).cur_multitest).right_count} из {MultiTest.get(id=UserTab.get(teleg_id=user_id).cur_multitest).ex_count}')
+            UserTab.update(cur_multitest='нет').where(UserTab.teleg_id == user_id).execute()
+    else:
+        my_bot.send_message(user_id, 'Тест закончен')
+        MultiTest.update(date_finish=datetime.now()).where(
+            MultiTest.id == UserTab.get(teleg_id=user_id).cur_multitest).execute()
+        my_bot.send_message(user_id,
+                            f'Результат {MultiTest.get(id=UserTab.get(teleg_id=user_id).cur_multitest).right_count} из {MultiTest.get(id=UserTab.get(teleg_id=user_id).cur_multitest).ex_count}')
+        UserTab.update(cur_multitest='нет').where(UserTab.teleg_id == user_id).execute()
+
+
+
+
+# сдвиг номера задания на следующий без удаления
+def multitest_sdvig(user_id):
+    ex_id = UserTab.get(teleg_id=user_id).multitests[-1].ex_data[1:-1].split(', ')
+    print('>>1>', ex_id)
+    first = ex_id[0]
+    for i in range(0, len(ex_id) - 1):
+        ex_id[i] = ex_id[i + 1]
+    ex_id[len(ex_id) - 1] = first
+    for i in range(0, len(ex_id)):
+        ex_id[i] = int(ex_id[i])
+    print('>>2>', ex_id)
+    MultiTest.update({MultiTest.ex_data: ex_id}).where(
+        MultiTest.id == UserTab.get(teleg_id=user_id).cur_multitest).execute()
+    return ex_id
+
+
+# сдвиг номера задания на следующей с удалением
+def multitest_sdvig_del(user_id):
+    ex_id = UserTab.get(teleg_id=user_id).multitests[-1].ex_data[1:-1].split(', ')
+    ex_id.pop(0)
+    print('>>>', ex_id)
+    for i in range(0, len(ex_id)):
+        ex_id[i] = int(ex_id[i])
+    print('>>>', ex_id)
+    MultiTest.update({MultiTest.ex_data: ex_id}).where(
+        MultiTest.id == UserTab.get(teleg_id=user_id).cur_multitest).execute()
+    return ex_id
+
+
+# проверка наличия и выполнения ДЗ ----------------------------------------
 @my_bot.callback_query_handler(func=lambda call: call.data == 'check_dz')
 def choice_theme_selftest_1t(call):
     user_id = call.message.chat.id
     choice_dz = types.InlineKeyboardMarkup()
     if len(UserTab.get(teleg_id=user_id).klass.dz_po_klassu.select()) > 4:
-        r=5
+        r = 5
     else:
-        r=len(UserTab.get(teleg_id=user_id).klass.dz_po_klassu.select())+1
-    for i in range(1,r):
+        r = len(UserTab.get(teleg_id=user_id).klass.dz_po_klassu.select()) + 1
+    for i in range(1, r):
         z1 = UserTab.get(teleg_id=user_id).klass.dz_po_klassu.select()[-i]
         if DzTable.get(id=z1.id).tests.select().where(
-                                SelfTest_1t.user == UserTab.get(teleg_id=user_id)).count() == 0:
-                            status_dz = 'не выполнено ❌'
+                SelfTest_1t.user == UserTab.get(teleg_id=user_id)).count() == 0:
+            status_dz = 'не выполнено ❌'
         else:
             status_dz = 'выполнено ✅'
         choice_dz.row(types.InlineKeyboardButton(text=f'{z1.name} - {status_dz}', callback_data=f'choice {z1.id}'))
     my_bot.send_message(user_id, 'Какое ДЗ открыть? ❓', reply_markup=choice_dz)
 
 
-#создание теста дз по шаблону и запуск теста
+# создание теста дз по шаблону и запуск теста
 @my_bot.callback_query_handler(func=lambda call: call.data.split(' ')[0] == 'choice')
 def create_dz_1t(call):
     dz = DzTable.get(id=call.data.split(' ')[1])
     user_id = call.message.chat.id
     tid_dz = SelfTest_1t.create(user=UserTab.get(teleg_id=user_id),
-                             theme=dz.theme,
-                             ex_count=dz.count,
-                             done_ex_count=0,
-                             right_count=0,
-                             date_start=datetime.now(),
-                             date_finish='',
-                             ex_data=gen_numex_dz_1t(dz),
-                             dz_id=dz.id).id
+                                theme=dz.theme,
+                                ex_count=dz.count,
+                                done_ex_count=0,
+                                right_count=0,
+                                date_start=datetime.now(),
+                                date_finish='',
+                                ex_data=gen_numex_dz_1t(dz),
+                                dz_id=dz.id).id
     UserTab.update({UserTab.cur_selftest_1t: tid_dz}).where(UserTab.teleg_id == user_id).execute()
     UserTab.update({UserTab.status: 'тест 1т старт'}).where(UserTab.teleg_id == user_id).execute()
     start_selftest_1t(call.message)
-
-
 
 
 # выбор темы для теста по 1 теме
