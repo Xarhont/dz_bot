@@ -144,7 +144,7 @@ def main(message):
 
         elif message.text == 'Проверить ДЗ':
             clearstatus()
-            dz_check1(message)
+            multidz_check1(message)
 
         elif new_multi_dz_status == 'жду названия мультидз':
             kl, zd = new_multi_dz.split('/')
@@ -352,63 +352,61 @@ def create_multi_dz2(call):
     my_bot.send_message(user_id, "Введите название для мультиДЗ 👇")
 
 
-# начало проверки ДЗ, выбор класса
-def dz_check1(message):
+# начало проверки МультиДЗ, выбор класса
+def multidz_check1(message):
     user_id = message.chat.id
     dz_klass_key = InlineKeyboardMarkup()
     # все классы из 7 параллели
     p7 = []
     for kl in Parallel.get(name='7').classes:
-        p7.append(InlineKeyboardButton(text=kl.name, callback_data=f"dz check_{kl.name}"))
+        p7.append(InlineKeyboardButton(text=kl.name, callback_data=f"multidz check_{kl.name}"))
     dz_klass_key.row(*p7)
     # 8 параллель
     p8 = []
     for kl in Parallel.get(name='8').classes:
-        p8.append(InlineKeyboardButton(text=kl.name, callback_data=f"dz check_{kl.name}"))
+        p8.append(InlineKeyboardButton(text=kl.name, callback_data=f"multidz check_{kl.name}"))
     dz_klass_key.row(*p8)
     # 9 параллель
     p9 = []
     for kl in Parallel.get(name='9').classes:
-        p9.append(InlineKeyboardButton(text=kl.name, callback_data=f"dz check_{kl.name}"))
+        p9.append(InlineKeyboardButton(text=kl.name, callback_data=f"multidz check_{kl.name}"))
     dz_klass_key.row(*p9)
     # 10 параллель
     p10 = []
     for kl in Parallel.get(name='10').classes:
-        p10.append(InlineKeyboardButton(text=kl.name, callback_data=f"dz check_{kl.name}"))
+        p10.append(InlineKeyboardButton(text=kl.name, callback_data=f"multidz check_{kl.name}"))
     dz_klass_key.row(*p10)
     # 11 параллель
     p11 = []
     for kl in Parallel.get(name='11').classes:
-        p11.append(InlineKeyboardButton(text=kl.name, callback_data=f"dz check_{kl.name}"))
+        p11.append(InlineKeyboardButton(text=kl.name, callback_data=f"multidz check_{kl.name}"))
     dz_klass_key.row(*p11)
     # вывод на кран клавы с классами
     my_bot.send_message(user_id, 'Какой класс открыть?', reply_markup=dz_klass_key)
 
 
 # Продолжение проверки ДЗ, выбор ДЗ
-@my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'dz check')
+@my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'multidz check')
 def dz_check2(call):
     user_id = call.message.chat.id
     # вывод всех дз по параллели
     dz_klass_check = types.InlineKeyboardMarkup()
-    for dz in Klass.get(name=call.data.split('_')[1]).dz_po_klassu:
+    for dz in Klass.get(name=call.data.split('_')[1]).multidz_po_klassu:
         dz_klass_check.row(types.InlineKeyboardButton(
-            text=f'от {dz.date_create.strftime("%d.%m")} по теме 📓 {dz.theme.name} 👉 {dz.name}',
-            callback_data=f"open dz_{dz.id}"),
-            types.InlineKeyboardButton(text='Выгрузить в файл', callback_data=f'download dz_{dz.id}'))
+            text=f'от {dz.date_create.strftime("%d.%m")} 👉 {dz.name}',
+            callback_data=f"open multidz_{dz.id}"),
+            types.InlineKeyboardButton(text='Выгрузить в файл', callback_data=f'download multidz_{dz.id}'))
     my_bot.send_message(user_id, 'Какое ДЗ открыть?', reply_markup=dz_klass_check)
 
 
-@my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'download dz')
+@my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'download multidz')
 def dz_download1(call):
     user_id = call.message.chat.id
-    dz = DzTable.get(id=call.data.split('_')[1])
+    dz = MultiDzTable.get(id=call.data.split('_')[1])
     dz_otchet = dz.tests
     shutil.copy2('shablon.docx', 'otchet_dz.docx')
-    # f = open('otchet_dz.docx','rb')
     doc = Document('otchet_dz.docx')
-    # doc = Document()
-    doc.add_heading(f'{dz.name} от {dz.date_create.strftime("%H:%M - %d.%m")} по теме {dz.theme.name}', 1)
+    doc.add_heading(f'{dz.name} от {dz.date_create.strftime("%H:%M - %d.%m")}', 1)
     for userdz in dz_otchet:
         doc.add_heading(
             f'{str(userdz.user.name).ljust(20, " ")} верно {str(userdz.right_count).rjust(2, " ")} из {str(userdz.ex_count).rjust(2, " ")} выполнение {userdz.date_start.strftime("%H:%M")}-{userdz.date_finish.strftime("%H:%M / %d.%m")}',
@@ -433,28 +431,134 @@ def dz_download1(call):
 
 
 # Продолжение проверки ДЗ, выбор конкретного теста юзера
-@my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'open dz')
+@my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'open multidz')
 def dz_check3(call):
     user_id = call.message.chat.id
     dz_user_check = types.InlineKeyboardMarkup()
-    for dz in DzTable.get(id=call.data.split('_')[1]).tests.select().order_by(SelfTest_1t.user):
+    for dz in MultiDzTable.get(id=call.data.split('_')[1]).tests.select().order_by(MultiTest.user):
         dz_user_check.row(types.InlineKeyboardButton(
             text=f'{str(dz.user.name).ljust(20, "=")} верно {str(dz.right_count).rjust(2, " ")} из {str(dz.ex_count).rjust(2, " ")} \n {dz.date_start.strftime("%H:%M - %d.%m")}/{dz.date_finish.strftime("%H:%M - %d.%m")}',
-            callback_data=f"open user dz_{dz.id}"))
+            callback_data=f"open user multidz_{dz.id}"))
     my_bot.send_message(user_id, 'Какой тест открыть??', reply_markup=dz_user_check)
 
 
-@my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'open user dz')
+@my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'open user multidz')
 def dz_check3(call):
     user_id = call.message.chat.id
-    my_bot.send_message(user_id, f'Тест юзера 👨‍🎓 {SelfTest_1t.get(id=call.data.split("_")[1]).user.name}')
-    for ex in SelfTest_1t.get(id=call.data.split('_')[1]).tests_ex:
+    my_bot.send_message(user_id, f'Тест юзера 👨‍🎓 {MultiTest.get(id=call.data.split("_")[1]).user.name}')
+    for ex in MultiTest.get(id=call.data.split('_')[1]).tests_ex:
         if ex.right == 'True':
             text = 'Верно ✅'
         else:
             text = 'Неверно ❌'
         my_bot.send_photo(user_id, ex.test_ex_id.photo)
         my_bot.send_message(user_id, f"Ответ юзера: {ex.user_answer} {text}")
+
+
+
+# # начало проверки ДЗ, выбор класса
+# def dz_check1(message):
+#     user_id = message.chat.id
+#     dz_klass_key = InlineKeyboardMarkup()
+#     # все классы из 7 параллели
+#     p7 = []
+#     for kl in Parallel.get(name='7').classes:
+#         p7.append(InlineKeyboardButton(text=kl.name, callback_data=f"dz check_{kl.name}"))
+#     dz_klass_key.row(*p7)
+#     # 8 параллель
+#     p8 = []
+#     for kl in Parallel.get(name='8').classes:
+#         p8.append(InlineKeyboardButton(text=kl.name, callback_data=f"dz check_{kl.name}"))
+#     dz_klass_key.row(*p8)
+#     # 9 параллель
+#     p9 = []
+#     for kl in Parallel.get(name='9').classes:
+#         p9.append(InlineKeyboardButton(text=kl.name, callback_data=f"dz check_{kl.name}"))
+#     dz_klass_key.row(*p9)
+#     # 10 параллель
+#     p10 = []
+#     for kl in Parallel.get(name='10').classes:
+#         p10.append(InlineKeyboardButton(text=kl.name, callback_data=f"dz check_{kl.name}"))
+#     dz_klass_key.row(*p10)
+#     # 11 параллель
+#     p11 = []
+#     for kl in Parallel.get(name='11').classes:
+#         p11.append(InlineKeyboardButton(text=kl.name, callback_data=f"dz check_{kl.name}"))
+#     dz_klass_key.row(*p11)
+#     # вывод на кран клавы с классами
+#     my_bot.send_message(user_id, 'Какой класс открыть?', reply_markup=dz_klass_key)
+#
+#
+# # Продолжение проверки ДЗ, выбор ДЗ
+# @my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'dz check')
+# def dz_check2(call):
+#     user_id = call.message.chat.id
+#     # вывод всех дз по параллели
+#     dz_klass_check = types.InlineKeyboardMarkup()
+#     for dz in Klass.get(name=call.data.split('_')[1]).dz_po_klassu:
+#         dz_klass_check.row(types.InlineKeyboardButton(
+#             text=f'от {dz.date_create.strftime("%d.%m")} по теме 📓 {dz.theme.name} 👉 {dz.name}',
+#             callback_data=f"open dz_{dz.id}"),
+#             types.InlineKeyboardButton(text='Выгрузить в файл', callback_data=f'download dz_{dz.id}'))
+#     my_bot.send_message(user_id, 'Какое ДЗ открыть?', reply_markup=dz_klass_check)
+#
+#
+# @my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'download dz')
+# def dz_download1(call):
+#     user_id = call.message.chat.id
+#     dz = DzTable.get(id=call.data.split('_')[1])
+#     dz_otchet = dz.tests
+#     shutil.copy2('shablon.docx', 'otchet_dz.docx')
+#     # f = open('otchet_dz.docx','rb')
+#     doc = Document('otchet_dz.docx')
+#     # doc = Document()
+#     doc.add_heading(f'{dz.name} от {dz.date_create.strftime("%H:%M - %d.%m")} по теме {dz.theme.name}', 1)
+#     for userdz in dz_otchet:
+#         doc.add_heading(
+#             f'{str(userdz.user.name).ljust(20, " ")} верно {str(userdz.right_count).rjust(2, " ")} из {str(userdz.ex_count).rjust(2, " ")} выполнение {userdz.date_start.strftime("%H:%M")}-{userdz.date_finish.strftime("%H:%M / %d.%m")}',
+#             1)
+#         for test in userdz.tests_ex:
+#             if test.right == 'True':
+#                 text1 = 'Верно ✅'
+#             else:
+#                 text1 = 'Неверно ❌'
+#             doc.add_heading(text1, 2)
+#             file_info = my_bot.get_file(test.test_ex_id.photo)
+#             downloadfile = my_bot.download_file(file_info.file_path)
+#             src = 'D:/Oge test bot 2.0/documents/' + '123.jpg'
+#             with open(src, 'wb') as new_file:
+#                 new_file.write(downloadfile)
+#             doc.add_picture('D:/Oge test bot 2.0/documents/123.jpg')
+#
+#     doc.save('otchet_dz.docx')
+#     f = open('otchet_dz.docx', "rb")
+#     my_bot.send_document(user_id, f)
+#     print('выгрузка закончена')
+#
+#
+# # Продолжение проверки ДЗ, выбор конкретного теста юзера
+# @my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'open dz')
+# def dz_check3(call):
+#     user_id = call.message.chat.id
+#     dz_user_check = types.InlineKeyboardMarkup()
+#     for dz in DzTable.get(id=call.data.split('_')[1]).tests.select().order_by(SelfTest_1t.user):
+#         dz_user_check.row(types.InlineKeyboardButton(
+#             text=f'{str(dz.user.name).ljust(20, "=")} верно {str(dz.right_count).rjust(2, " ")} из {str(dz.ex_count).rjust(2, " ")} \n {dz.date_start.strftime("%H:%M - %d.%m")}/{dz.date_finish.strftime("%H:%M - %d.%m")}',
+#             callback_data=f"open user dz_{dz.id}"))
+#     my_bot.send_message(user_id, 'Какой тест открыть??', reply_markup=dz_user_check)
+#
+#
+# @my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'open user dz')
+# def dz_check3(call):
+#     user_id = call.message.chat.id
+#     my_bot.send_message(user_id, f'Тест юзера 👨‍🎓 {SelfTest_1t.get(id=call.data.split("_")[1]).user.name}')
+#     for ex in SelfTest_1t.get(id=call.data.split('_')[1]).tests_ex:
+#         if ex.right == 'True':
+#             text = 'Верно ✅'
+#         else:
+#             text = 'Неверно ❌'
+#         my_bot.send_photo(user_id, ex.test_ex_id.photo)
+#         my_bot.send_message(user_id, f"Ответ юзера: {ex.user_answer} {text}")
 
 
 # начало создания нового дз по 1 теме на класс
