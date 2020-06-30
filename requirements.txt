@@ -1,8 +1,10 @@
 certifi==2020.4.5.2
 chardet==3.0.4
 idna==2.9
+lxml==4.5.1
 peewee==3.13.3
 pyTelegramBotAPI==3.7.1
+python-docx==0.8.10
 requests==2.23.0
 six==1.15.0
 urllib3==1.25.9
