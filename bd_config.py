@@ -128,15 +128,6 @@ class SelfTest_1t_ex(BaseModel):
 
 
 
-# DzTable.create_table()
-
-# UserTab.drop_table()
-# UserTab.create_table()
-# SelfTest_1t_ex.drop_table()
-# SelfTest_1t_ex.create_table()
-# SelfTest_1t.drop_table()
-# SelfTest_1t.create_table()
-
 
 #генерация id заданий по одной теме в запрашиваемом количестве
 def gen_numex_1t(message):
