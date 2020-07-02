@@ -12,8 +12,8 @@ from random import *
 # apihelper.proxy = {'https': 'socks5://190737618:TsT9nZls@orbtl.s5.opennetwork.cc:999'}  # работал до 29 мая
 # apihelper.proxy = {'https': 'socks5://142.93.170.92:1080'}  # 30 июня - 1
 # apihelper.proxy = {'https': 'socks5://165.22.65.160:19488'}  # 30 июня - 2
-apihelper.proxy = {'https': 'socks5://78.46.218.20:12041'}  # 30 июня - 3
-# apihelper.proxy = {'https': 'socks5://185.161.211.25:1080'}
+# apihelper.proxy = {'https': 'socks5://78.46.218.20:12041'}  # 30 июня - 3
+apihelper.proxy = {'https': 'socks5://1rje3TFpVJ:Er2GduoOmw@45.92.172.55:55276'} #куплена до 5 июля
 my_bot = telebot.TeleBot('1245059539:AAGqbmMsH9bQu6-e3RjkYmCblt9vbKCvf2Y')
 init_db()
 
@@ -186,7 +186,7 @@ def main(message):
 def dz_delete1(message):
     user_id = message.chat.id
     dz_del_key = InlineKeyboardMarkup()
-    for dz in DzTable.select()[::-1]:
+    for dz in MultiDzTable.select()[::-1]:
         dz_del_key.row(types.InlineKeyboardButton(
             text=f'{dz.name} для {dz.klass.name} от {dz.date_create.strftime("%H:%M - %d.%m")}',
             callback_data=f'del dz_{dz.id}'))
@@ -204,7 +204,7 @@ def dz_delete2(call):
 
 @my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'del dz1')
 def dz_delete3(call):
-    DzTable.get(id=(call.data.split('_')[1])).delete_instance()
+    MultiDzTable.get(id=(call.data.split('_')[1])).delete_instance()
     my_bot.answer_callback_query(call.id, text="ДЗ удалено")
 
 
