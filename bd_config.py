@@ -75,13 +75,13 @@ class UserTab(BaseModel):
     cur_multitest = IntegerField()
 
 
-class DzTable(BaseModel):
-    id = AutoField()
-    klass = ForeignKeyField(Klass, backref='dz_po_klassu')
-    theme = ForeignKeyField(Theme, backref='dz_po_teme')
-    count = IntegerField()
-    name = CharField()
-    date_create = DateTimeField()
+# class DzTable(BaseModel):
+#     id = AutoField()
+#     klass = ForeignKeyField(Klass, backref='dz_po_klassu')
+#     theme = ForeignKeyField(Theme, backref='dz_po_teme')
+#     count = IntegerField()
+#     name = CharField()
+#     date_create = DateTimeField()
 
 
 class MultiDzTable(BaseModel):
@@ -92,17 +92,17 @@ class MultiDzTable(BaseModel):
     date_create = DateTimeField()
 
 
-class SelfTest_1t(BaseModel):
-    id = AutoField()
-    user = ForeignKeyField(UserTab, backref='tests')
-    theme = ForeignKeyField(Theme, backref='tests')
-    ex_data = CharField()
-    ex_count = IntegerField()
-    done_ex_count = IntegerField()
-    right_count = IntegerField()
-    date_start = DateTimeField()
-    date_finish = DateTimeField()
-    dz_id = ForeignKeyField(DzTable, backref='tests')
+# class SelfTest_1t(BaseModel):
+#     id = AutoField()
+#     user = ForeignKeyField(UserTab, backref='tests')
+#     theme = ForeignKeyField(Theme, backref='tests')
+#     ex_data = CharField()
+#     ex_count = IntegerField()
+#     done_ex_count = IntegerField()
+#     right_count = IntegerField()
+#     date_start = DateTimeField()
+#     date_finish = DateTimeField()
+#     dz_id = ForeignKeyField(DzTable, backref='tests')
 
 
 class MultiTest(BaseModel):
@@ -118,11 +118,11 @@ class MultiTest(BaseModel):
 
 
 class SelfTest_1t_ex(BaseModel):
-    test_id = ForeignKeyField(SelfTest_1t, backref='tests_ex', null=True)
+    user = ForeignKeyField(UserTab, backref='all_ex')
     test_ex_id = ForeignKeyField(TestExample, backref='selftets_1t')
     user_answer = CharField()
     right = CharField()
-    date = DateField()
+    date = DateTimeField()
     multitest_id = ForeignKeyField(MultiTest, backref='tests_ex', null=False)
 
 
