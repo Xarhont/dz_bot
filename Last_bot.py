@@ -7,14 +7,13 @@ from docx import Document
 import docx
 import shutil
 from googtab import svobodn_string, zapis_rez
-from random import *
 
 # apihelper.proxy = {'https': 'socks5://190737618:TsT9nZls@orbtl.s5.opennetwork.cc:999'}  # работал до 29 мая
 # apihelper.proxy = {'https': 'socks5://142.93.170.92:1080'}  # 30 июня - 1
 # apihelper.proxy = {'https': 'socks5://165.22.65.160:19488'}  # 30 июня - 2
 # apihelper.proxy = {'https': 'socks5://78.46.218.20:12041'}  # 30 июня - 3
-# apihelper.proxy = {'https': 'socks5://1rje3TFpVJ:Er2GduoOmw@45.92.172.55:55276'} #куплена до 5 июля
-my_bot = telebot.TeleBot('1245059539:AAGqbmMsH9bQu6-e3RjkYmCblt9vbKCvf2Y')
+apihelper.proxy = {'https': 'socks5://1rje3TFpVJ:Er2GduoOmw@45.92.172.55:55276'} #куплена до 8 сентября
+my_bot = telebot.TeleBot('1245059539:AAEL9lRvA46urwPZmWessOONPgP920cjaTg')
 init_db()
 
 ##для учителя
@@ -59,6 +58,7 @@ def start_message(message):
             UserTab.create(teleg_id=user_id,
                            name='',
                            klass='',
+                           cur_selftest_1t='',
                            reg_status='Нет фио',
                            reg_date=datetime.now(),
                            status='',
@@ -97,7 +97,7 @@ def main(message):
             # возможность сразу добавить еще одно задание по этой теме
             more_add_ex = types.InlineKeyboardMarkup()
             more_add_ex.row(types.InlineKeyboardButton(text='Да',
-                                                       callback_data=f'example add_{Theme.get(id=str(new_example.theme)).name}'))
+                                                       callback_data=f'example add_{Theme.get(id=str(new_example.theme)).id}'))
             my_bot.send_message(user_id, 'Добавить еще одно задание в эту тему?', reply_markup=more_add_ex)
 
         if db_edit_status == 'ожидание нового ответа':  # запись нового овтета на задание в бд
@@ -433,8 +433,12 @@ def dz_download1(call):
     table = doc.add_table(rows=2, cols=10)
     table.style = 'Table Grid'
     for userdz in dz_otchet:
+        if userdz.date_finish == '':
+            findate = 'незакончено'
+        else:
+            findate = userdz.date_finish.strftime("%H:%M - %d.%m")
         doc.add_heading(
-            f'{str(userdz.user.name).ljust(20, " ")} верно {str(userdz.right_count).rjust(2, " ")} из {str(userdz.ex_count).rjust(2, " ")} выполнение {userdz.date_start.strftime("%H:%M")}-{userdz.date_finish.strftime("%H:%M / %d.%m")}',
+            f'{str(userdz.user.name).ljust(20, " ")} верно {str(userdz.right_count).rjust(2, " ")} из {str(userdz.ex_count).rjust(2, " ")} выполнение {userdz.date_start.strftime("%H:%M")}-{findate}',
             1)
         for test in userdz.tests_ex:
             if test.right == 'True':
@@ -472,8 +476,12 @@ def dz_check3(call):
     user_id = call.message.chat.id
     dz_user_check = types.InlineKeyboardMarkup()
     for dz in MultiDzTable.get(id=call.data.split('_')[1]).tests.select().order_by(MultiTest.user):
+        if dz.date_finish == '':
+            findate = 'незакончено'
+        else:
+            findate = dz.date_finish.strftime("%H:%M - %d.%m")
         dz_user_check.row(types.InlineKeyboardButton(
-            text=f'{str(dz.user.name).ljust(20, "=")} верно {str(dz.right_count).rjust(2, " ")} из {str(dz.ex_count).rjust(2, " ")} \n {dz.date_start.strftime("%H:%M - %d.%m")}/{dz.date_finish.strftime("%H:%M - %d.%m")}',
+            text=f'{str(dz.user.name).ljust(20, "=")} верно {str(dz.right_count).rjust(2, " ")} из {str(dz.ex_count).rjust(2, " ")} \n {dz.date_start.strftime("%H:%M - %d.%m")}/{findate}',
             callback_data=f"open user multidz_{dz.id}"))
     my_bot.send_message(user_id, 'Какой тест открыть??', reply_markup=dz_user_check)
 
@@ -497,7 +505,7 @@ def OGE_DB_APPEND3(call):
     global new_example
     user_id = call.message.chat.id
     db_append_status = 'ожидание фото'
-    new_example = Example(theme=Theme.get(name=call.data.split('_')[1]), photo='', answer='')
+    new_example = Example(theme=Theme.get(id=call.data.split('_')[1]), photo='', answer='')
     my_bot.send_message(user_id, 'Пришлите фото нового задания')
 
 
@@ -508,7 +516,7 @@ def OGE_DB_EDIT2(call):
     global edit_example
     user_id = call.message.chat.id
     db_edit_status = 'выбор задания'
-    edit_example = Example(theme=Theme.get(name=call.data.split('_')[1]), photo='', answer='')
+    edit_example = Example(theme=Theme.get(id=call.data.split('_')[1]), photo='', answer='')
     allTestsOfTheme = TestExample.select().where(TestExample.theme == Theme.get(id=edit_example.theme))
     for ex in allTestsOfTheme:
         my_bot.send_message(user_id, f'Задание № {ex.id}   Ответ: {ex.answer}')
@@ -605,7 +613,7 @@ def OGE_DB_APPEND1(user_id):
     choice_theme_keyboard = types.InlineKeyboardMarkup()
     for theme in test_themes:
         choice_theme_keyboard.row(types.InlineKeyboardButton(text=theme.name,
-                                                             callback_data=f'example add_{theme.name}'))
+                                                             callback_data=f'example add_{theme.id}'))
     my_bot.send_message(user_id, 'Какую тему дополним?', reply_markup=choice_theme_keyboard)
 
 
@@ -615,7 +623,7 @@ def OGE_DB_EDIT1(user_id):
     choice_theme_keyboard = types.InlineKeyboardMarkup()
     for theme in test_themes:
         choice_theme_keyboard.row(types.InlineKeyboardButton(text=theme.name,
-                                                             callback_data=f'theme edit_{theme.name}'))
+                                                             callback_data=f'theme edit_{theme.id}'))
     my_bot.send_message(user_id, 'Какую тему открыть для изменения?', reply_markup=choice_theme_keyboard)
 
 

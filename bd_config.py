@@ -92,6 +92,7 @@ class MultiDzTable(BaseModel):
     date_create = DateTimeField()
 
 
+
 # class SelfTest_1t(BaseModel):
 #     id = AutoField()
 #     user = ForeignKeyField(UserTab, backref='tests')
@@ -183,22 +184,38 @@ def multidz_count_sum(zadanie):
 # print(UserTab.get(teleg_id=user_id).tests[-1].ex_data[0])
 
 # Klass.drop_table()
-# Klass.create_table()4
-# UserTab.drop_table()
-# UserTab.create_table()
-#
-# Klass.create(name='8В', paral=Parallel.get(name='8') )
-# for i in range(7, 12):
-#     Parallel.create(name=i)
-# TestExample.drop_table()
-# TestExample.create_table()
-# SelfTest_1t.drop_table()
-# SelfTest_1t.create_table()
-# SelfTest_1t_ex.drop_table()
-# SelfTest_1t_ex.create_table()
-# DzTable.drop_table()
-# DzTable.create_table()
+# Klass.create_table()
 # MultiDzTable.drop_table()
 # MultiDzTable.create_table()
 # MultiTest.drop_table()
 # MultiTest.create_table()
+# SelfTest_1t_ex.drop_table()
+# SelfTest_1t_ex.create_table()
+# TestExample.drop_table()
+# TestExample.create_table()
+# Theme.drop_table()
+# Theme.create_table()
+# UserTab.drop_table()
+# UserTab.create_table()
+#
+# Klass.create(name='7к', paral=Parallel.get(name='7') )
+# Klass.create(name='8и', paral=Parallel.get(name='8') )
+# Klass.create(name='8м', paral=Parallel.get(name='8') )
+# Klass.create(name='8э', paral=Parallel.get(name='8') )
+# Klass.create(name='8я', paral=Parallel.get(name='8') )
+# Klass.create(name='9а', paral=Parallel.get(name='9') )
+# Klass.create(name='9б', paral=Parallel.get(name='9') )
+# Klass.create(name='9в', paral=Parallel.get(name='9') )
+# Klass.create(name='9г', paral=Parallel.get(name='9') )
+# Klass.create(name='9к', paral=Parallel.get(name='9') )
+# Klass.create(name='9л', paral=Parallel.get(name='9') )
+# Klass.create(name='9м', paral=Parallel.get(name='9') )
+# Klass.create(name='10', paral=Parallel.get(name='10') )
+# Klass.create(name='11', paral=Parallel.get(name='11') )
+# for i in range(7, 12):
+#     Parallel.create(name=i)
+
+# tem = ['Декодирование']
+# for i in tem:
+#     Theme.create(name=i)
+# Theme.create(name='Кодирование текстовой информации')
