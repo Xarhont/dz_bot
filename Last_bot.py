@@ -232,7 +232,7 @@ def create_multi_dz(message):
     global new_multi_dz_themes
     global new_multi_dz_theme
     for theme in Theme.select():
-        new_multi_dz_themes[theme.name] = Multi_dz_theme(tema=theme.name, active='no', count=0)
+        new_multi_dz_themes[theme.id] = Multi_dz_theme(tema=theme.name, id=theme.id, active='no', count=0)
     create_multi_dz_key(message)
 
 
@@ -246,7 +246,7 @@ def create_multi_dz_key(message):
         if theme.active == 'yes':
             text += '✅'
         multi_dz_theme.row(types.InlineKeyboardButton(text=text,
-                                                      callback_data=f"append to multidz_{theme.tema}"))
+                                                      callback_data=f"append to multidz_{theme.id}"))
     multi_dz_theme.row(types.InlineKeyboardButton(text='Далее ➡️',
                                                   callback_data=f"create_multi_dz2"))
     my_bot.send_message(user_id, 'Выберите темы для мульти ДЗ 👇', reply_markup=multi_dz_theme)
@@ -257,11 +257,12 @@ def create_multi_dz_key(message):
 def create_multi_dz2(call):
     global new_multi_dz_themes
     user_id = call.message.chat.id
-    if new_multi_dz_themes[call.data.split('_')[1]].active == 'no':
-        new_multi_dz_themes[call.data.split('_')[1]].active = 'yes'
+    id = int(call.data.split('_')[1])
+    if new_multi_dz_themes[id].active == 'no':
+        new_multi_dz_themes[id].active = 'yes'
     else:
-        new_multi_dz_themes[call.data.split('_')[1]].active = 'no'
-        new_multi_dz_themes[call.data.split('_')[1]].count = 0
+        new_multi_dz_themes[id].active = 'no'
+        new_multi_dz_themes[id].count = 0
     multi_dz_keyboard(call)  # вызов клавиатуры с выбором тем и кол-ва заданий
 
 
@@ -270,7 +271,7 @@ def create_multi_dz2(call):
 def create_multi_dz2(call):
     global new_multi_dz_themes
     user_id = call.message.chat.id
-    new_multi_dz_themes[call.data.split('_')[1]].count = int(call.data.split('_')[2])
+    new_multi_dz_themes[int(call.data.split('_')[1])].count = int(call.data.split('_')[2])
     multi_dz_keyboard(call)
 
 
@@ -283,30 +284,30 @@ def multi_dz_keyboard(call):
             if theme.count > 0:
                 text += f'👉 {theme.count}'
         multi_dz_theme1.row(types.InlineKeyboardButton(text=text,
-                                                       callback_data=f"append to multidz_{theme.tema}"))
+                                                       callback_data=f"append to multidz_{theme.id}"))
 
         # кнопки кол-ва заданий
         if theme.active == 'yes' and theme.count == 0:
             multi_dz_theme1.row(types.InlineKeyboardButton(text=1,
-                                                           callback_data=f"multdz count_{theme.tema}_1"),
+                                                           callback_data=f"multdz count_{theme.id}_1"),
                                 types.InlineKeyboardButton(text=2,
-                                                           callback_data=f"multdz count_{theme.tema}_2"),
+                                                           callback_data=f"multdz count_{theme.id}_2"),
                                 types.InlineKeyboardButton(text=3,
-                                                           callback_data=f"multdz count_{theme.tema}_3"),
+                                                           callback_data=f"multdz count_{theme.id}_3"),
                                 types.InlineKeyboardButton(text=4,
-                                                           callback_data=f"multdz count_{theme.tema}_4"),
+                                                           callback_data=f"multdz count_{theme.id}_4"),
                                 types.InlineKeyboardButton(text=5,
-                                                           callback_data=f"multdz count_{theme.tema}_5"))
+                                                           callback_data=f"multdz count_{theme.id}_5"))
             multi_dz_theme1.row(types.InlineKeyboardButton(text=6,
-                                                           callback_data=f"multdz count_{theme.tema}_6"),
+                                                           callback_data=f"multdz count_{theme.id}_6"),
                                 types.InlineKeyboardButton(text=7,
-                                                           callback_data=f"multdz count_{theme.tema}_7"),
+                                                           callback_data=f"multdz count_{theme.id}_7"),
                                 types.InlineKeyboardButton(text=8,
-                                                           callback_data=f"multdz count_{theme.tema}_8"),
+                                                           callback_data=f"multdz count_{theme.id}_8"),
                                 types.InlineKeyboardButton(text=9,
-                                                           callback_data=f"multdz count_{theme.tema}_9"),
+                                                           callback_data=f"multdz count_{theme.id}_9"),
                                 types.InlineKeyboardButton(text=10,
-                                                           callback_data=f"multdz count_{theme.tema}_10"))
+                                                           callback_data=f"multdz count_{theme.id}_10"))
 
     multi_dz_theme1.row(types.InlineKeyboardButton(text='Далее ➡️',
                                                    callback_data=f"create_multi_dz2"))

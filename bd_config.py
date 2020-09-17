@@ -47,11 +47,13 @@ def new_example_added_to_bd(example: Example):
 
 class Multi_dz_theme:
     tema: str
+    id: str
     active: str
     count: int
 
-    def __init__(self, tema, active, count):
+    def __init__(self, tema, id, active, count):
         self.tema = tema
+        self.id = id
         self.active = active
         self.count = count
 
