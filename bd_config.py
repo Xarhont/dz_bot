@@ -220,4 +220,4 @@ def multidz_count_sum(zadanie):
 # tem = ['Декодирование']
 # for i in tem:
 #     Theme.create(name=i)
-# Theme.create(name='Кодирование текстовой информации')
+# Theme.create(name='Декодирование Фано')

@@ -7,12 +7,13 @@ from docx import Document
 import docx
 import shutil
 from googtab import svobodn_string, zapis_rez
+from my_func import *
 
 # apihelper.proxy = {'https': 'socks5://190737618:TsT9nZls@orbtl.s5.opennetwork.cc:999'}  # работал до 29 мая
 # apihelper.proxy = {'https': 'socks5://142.93.170.92:1080'}  # 30 июня - 1
 # apihelper.proxy = {'https': 'socks5://165.22.65.160:19488'}  # 30 июня - 2
 # apihelper.proxy = {'https': 'socks5://78.46.218.20:12041'}  # 30 июня - 3
-apihelper.proxy = {'https': 'socks5://1rje3TFpVJ:Er2GduoOmw@45.92.172.55:55276'} #куплена до 8 сентября
+apihelper.proxy = {'https': 'socks5://1rje3TFpVJ:Er2GduoOmw@45.92.172.55:55276'}  # куплена до 8 сентября
 my_bot = telebot.TeleBot('1245059539:AAEL9lRvA46urwPZmWessOONPgP920cjaTg')
 init_db()
 
@@ -32,7 +33,7 @@ main_page_markup = types.ReplyKeyboardMarkup(True)
 main_page_markup.row('База заданий', 'Работа с ДЗ')
 # клавиатура работы с БД
 main_bd_markup = types.ReplyKeyboardMarkup(True)
-main_bd_markup.row('Дополнить БД ОГЭ', 'Изменить задание')
+main_bd_markup.row('Темы', 'Дополнить БД ОГЭ', 'Изменить задание')
 main_bd_markup.row('На главную')
 # клавиатура работы с ДЗ
 main_dz_markup = types.ReplyKeyboardMarkup(True)
@@ -132,7 +133,12 @@ def main(message):
                                 name=message.text, zadanie=zd, date_create=datetime.now())
             my_bot.send_message(user_id, f'МультиДЗ для {kl} создано 👍')
             clearstatus()
+        elif message.text == 'Темы':
+            themekey(my_bot, user_id)
 
+        elif db_edit_status == 'жду новой темы':
+            Theme.create(name=message.text)
+            my_bot.send_message(user_id, 'Тема добавлена')
 
 
     # для студента--------------------------------------------------------------------
@@ -209,6 +215,15 @@ def dz_delete1(message):
             text=f'{dz.name} для {dz.klass.name} от {dz.date_create.strftime("%H:%M - %d.%m")}',
             callback_data=f'del dz_{dz.id}'))
     my_bot.send_message(user_id, 'Какое ДЗ удалить?', reply_markup=dz_del_key)
+
+
+@my_bot.callback_query_handler(func=lambda call: call.data == 'theme_add')
+def theme_add(call):
+    user_id = call.message.chat.id
+    global db_edit_status
+    db_edit_status = 'жду новой темы'
+    my_bot.send_message(user_id, 'Напишите название новой темы 👇')
+
 
 
 @my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'del dz')
@@ -459,10 +474,10 @@ def dz_download1(call):
     for col in range(10):
         cell = table.cell(0, col)
         cell.text = f'Задание {col + 1}'
-    for col in range(1,5):
-        cell = table.cell(1, col-1)
+    for col in range(1, 5):
+        cell = table.cell(1, col - 1)
         if analiz[f"z_{col}"] > 0:
-            cell.text = f'{round((analiz[f"zt_{col}"]/analiz[f"z_{col}"]),3)*100}%'
+            cell.text = f'{round((analiz[f"zt_{col}"] / analiz[f"z_{col}"]), 3) * 100}%'
         else:
             cell.text = f'-'
     doc.save('otchet_dz.docx')
