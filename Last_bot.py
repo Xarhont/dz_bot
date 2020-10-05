@@ -405,15 +405,20 @@ def dz_check2(call):
 
 
 
+
+
+
 ##выгрузка 2.0
 @my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'download multidz')
 def dz_download1(call):
     user_id = call.message.chat.id
     dz = MultiDzTable.get(id=call.data.split('_')[1])
-    dz_otchet = dz.tests
+    dz_otchet = dz.tests.order_by(MultiTest.user.name)
     shutil.copy2('shablon.docx', 'otchet_dz.docx')
     doc = Document('otchet_dz.docx')
-
+    per = 0
+    nn = my_bot.send_message(user_id, f'выгрузка {per}/{dz_otchet.count()}')
+    print(nn.message_id)
     tems = {}
     for tema in dz.zadanie.split(';'):
         tems[tema.split('_')[0]] = {'count': 0, 'true': 0}
@@ -445,7 +450,8 @@ def dz_download1(call):
             with open(src, 'wb') as new_file:
                 new_file.write(downloadfile)
             doc.add_picture('D:/Oge test bot 2.0/documents/123.jpg', width=docx.shared.Cm(10))
-
+        per += 1
+        my_bot.edit_message_text(chat_id=user_id,message_id=nn.message_id,text= f'выгрузка {per}/{dz_otchet.count()}')
     row = 0
     for tem in tems:
         print(tems.get(tem).get('true'))
