@@ -418,40 +418,45 @@ def dz_download1(call):
     doc = Document('otchet_dz.docx')
     per = 0
     nn = my_bot.send_message(user_id, f'выгрузка {per}/{dz_otchet.count()}')
-    print(nn.message_id)
+
     tems = {}
     for tema in dz.zadanie.split(';'):
         tems[tema.split('_')[0]] = {'count': 0, 'true': 0}
 
+    # for user in dz.klass.users.order_by(UserTab.name):
+    #     print(user.name)
     doc.add_heading(f'{dz.name} от {dz.date_create.strftime("%H:%M - %d.%m")}', 1)
     table = doc.add_table(rows=len(dz.zadanie.split(';')), cols=2)
     table.style = 'Table Grid'
     per = 0
-    for userdz in dz_otchet:
-        if userdz.date_finish == '':
-            findate = 'незакончено'
-        else:
-            findate = userdz.date_finish.strftime("%H:%M - %d.%m")
-        doc.add_heading(
-            f'{str(userdz.user.name).ljust(20, " ")} верно {str(userdz.right_count).rjust(2, " ")} из {str(userdz.ex_count).rjust(2, " ")} выполнение {userdz.date_start.strftime("%H:%M")}-{findate}',
-            1)
-        for test in userdz.tests_ex:
-            if test.right == 'True':
-                text1 = 'Верно ✅'
-                tems[f'{test.test_ex_id.theme.name}']['count'] += 1
-                tems[f'{test.test_ex_id.theme.name}']['true'] += 1
+
+    for user in MultiDzTable.get(id=call.data.split('_')[1]).klass.users.order_by(UserTab.name):
+        for userdz in MultiDzTable.get(id=call.data.split('_')[1]).tests.select().where(MultiTest.user == user):
+
+            if userdz.date_finish == '':
+                findate = 'незакончено'
             else:
-                text1 = 'Неверно ❌'
-                tems[f'{test.test_ex_id.theme.name}']['count'] += 1
-            doc.add_heading(text1, 2)
-            file_info = my_bot.get_file(test.test_ex_id.photo)
-            downloadfile = my_bot.download_file(file_info.file_path)
-            src = 'D:/Oge test bot 2.0/documents/' + '123.jpg'
-            with open(src, 'wb') as new_file:
-                new_file.write(downloadfile)
-            doc.add_picture('D:/Oge test bot 2.0/documents/123.jpg', width=docx.shared.Cm(10))
-        per += 1
-        my_bot.edit_message_text(chat_id=user_id,message_id=nn.message_id,text= f'выгрузка {per}/{dz_otchet.count()}')
+                findate = userdz.date_finish.strftime("%H:%M - %d.%m")
+            doc.add_heading(
+                f'{str(userdz.user.name).ljust(20, " ")} верно {str(userdz.right_count).rjust(2, " ")} из {str(userdz.ex_count).rjust(2, " ")} выполнение {userdz.date_start.strftime("%H:%M")}-{findate}',
+                1)
+            for test in userdz.tests_ex:
+                if test.right == 'True':
+                    text1 = 'Верно ✅'
+                    tems[f'{test.test_ex_id.theme.name}']['count'] += 1
+                    tems[f'{test.test_ex_id.theme.name}']['true'] += 1
+                else:
+                    text1 = 'Неверно ❌'
+                    tems[f'{test.test_ex_id.theme.name}']['count'] += 1
+                doc.add_heading(text1, 2)
+                file_info = my_bot.get_file(test.test_ex_id.photo)
+                downloadfile = my_bot.download_file(file_info.file_path)
+                src = 'D:/Oge test bot 2.0/documents/' + '123.jpg'
+                with open(src, 'wb') as new_file:
+                    new_file.write(downloadfile)
+                doc.add_picture('D:/Oge test bot 2.0/documents/123.jpg', width=docx.shared.Cm(10))
+            per += 1
+            my_bot.edit_message_text(chat_id=user_id,message_id=nn.message_id,text= f'выгрузка {per}/{dz_otchet.count()}')
     row = 0
     for tem in tems:
         print(tems.get(tem).get('true'))
@@ -474,14 +479,16 @@ def dz_download1(call):
 def dz_check3(call):
     user_id = call.message.chat.id
     dz_user_check = types.InlineKeyboardMarkup()
-    for dz in MultiDzTable.get(id=call.data.split('_')[1]).tests.select().order_by(MultiTest.user):
-        if dz.date_finish == '':
-            findate = 'незакончено'
-        else:
-            findate = dz.date_finish.strftime("%H:%M - %d.%m")
-        dz_user_check.row(types.InlineKeyboardButton(
-            text=f'{str(dz.user.name).ljust(20, "=")} верно {str(dz.right_count).rjust(2, " ")} из {str(dz.ex_count).rjust(2, " ")} \n {dz.date_start.strftime("%H:%M - %d.%m")}/{findate}',
-            callback_data=f"open user multidz_{dz.id}"))
+
+    for user in MultiDzTable.get(id=call.data.split('_')[1]).klass.users.order_by(UserTab.name):
+        for dz in MultiDzTable.get(id=call.data.split('_')[1]).tests.select().where(MultiTest.user == user):
+            if dz.date_finish == '':
+                findate = 'незакончено'
+            else:
+                findate = dz.date_finish.strftime("%H:%M - %d.%m")
+            dz_user_check.row(types.InlineKeyboardButton(
+                text=f'{str(dz.user.name).ljust(20, "=")} верно {str(dz.right_count).rjust(2, " ")} из {str(dz.ex_count).rjust(2, " ")} \n {dz.date_start.strftime("%H:%M - %d.%m")}/{findate}',
+                callback_data=f"open user multidz_{dz.id}"))
     my_bot.send_message(user_id, 'Какой тест открыть??', reply_markup=dz_user_check)
 
 
