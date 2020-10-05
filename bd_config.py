@@ -12,12 +12,14 @@ class BaseModel(Model):
 
 class Theme(BaseModel):
     name = CharField(unique=True)
+    archive = CharField()
 
 
 class TestExample(BaseModel):
     theme = ForeignKeyField(Theme, backref='examples')
     photo = CharField()
     answer = CharField()
+    archive = CharField()
 
 
 def init_db():
@@ -32,17 +34,19 @@ class Example:
     theme: str
     photo: str
     answer: str
+    archive: str
     id: int
 
-    def __init__(self, theme, photo, answer):
+    def __init__(self, theme, photo, answer, archive):
         self.theme = theme
         self.photo = photo
         self.answer = answer
+        self.archive = archive
         self.id = id
 
 
 def new_example_added_to_bd(example: Example):
-    TestExample.create(theme=example.theme, photo=example.photo, answer=example.answer)
+    TestExample.create(theme=example.theme, photo=example.photo, answer=example.answer, archive='NO')
 
 
 class Multi_dz_theme:
@@ -157,7 +161,7 @@ def gen_numex_multi_dz(zadanie):
     ex_data = []
     for part in zadanie.split(';'):
         ex_data_part = []
-        part_ex = Theme.get(name=part.split('_')[0]).examples
+        part_ex = Theme.get(name=part.split('_')[0]).examples.select().where(TestExample.archive == 'NO')
         for ex in part_ex:
             ex_data_part.append(ex.id)
         ex_data += random.sample(ex_data_part, int(part.split('_')[1]))

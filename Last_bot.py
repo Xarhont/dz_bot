@@ -76,6 +76,7 @@ def start_message(message):
 @my_bot.message_handler(content_types=['text'])
 def main(message):
     user_id = message.chat.id
+    print('На главную')
     # для учителя--------------------------------------------------------------------
     global db_append_status
     global new_example
@@ -137,10 +138,13 @@ def main(message):
             themekey(my_bot, user_id)
 
         elif db_edit_status == 'жду новой темы':
-            Theme.create(name=message.text)
+            Theme.create(name=message.text, archive='NO')
             my_bot.send_message(user_id, 'Тема добавлена')
+            clearstatus()
 
-
+        elif db_edit_status.split('_')[0] == 'Жду нового названия темы для':
+            Theme.update(name=message.text).where(Theme.id==int(db_edit_status.split('_')[1])).execute()
+            my_bot.send_message(user_id, 'Название темы изменено')
     # для студента--------------------------------------------------------------------
     else:
         if UserTab.select().where(UserTab.teleg_id == user_id).count() == 0:
@@ -157,54 +161,11 @@ def main(message):
                 start_multitest(message)
             elif UserTab.get(teleg_id=user_id).status == 'мультитест в процессе':
                 do_multitest(message)
+            my_bot.send_message(user_id, f'☝☝☝',
+                                reply_markup=main_student_markup)
 
 
 ##для учителя------------------------------------------------------------------------
-# выгрузка данных в google таблицу для анализа
-def google_otchet():
-    for user in Klass.get(name='8А').users:
-        z1t = 0
-        z1 = 0
-        z2t = 0
-        z2 = 0
-        z3t = 0
-        z3 = 0
-        z4t = 0
-        z4 = 0
-        for test in user.all_ex:
-            if test.date.month == 7:
-                if test.test_ex_id.theme == Theme.get(name='Задание 1'):
-                    if test.right == 'True':
-                        z1 += 1
-                        z1t += 1
-                    else:
-                        z1 += 1
-                if test.test_ex_id.theme == Theme.get(name='Задание 2'):
-                    if test.right == 'True':
-                        z2 += 1
-                        z2t += 1
-                    else:
-                        z2 += 1
-                if test.test_ex_id.theme == Theme.get(name='Задание 3'):
-                    if test.right == 'True':
-                        z3 += 1
-                        z3t += 1
-                    else:
-                        z3 += 1
-                if test.test_ex_id.theme == Theme.get(name='Задание 4'):
-                    if test.right == 'True':
-                        z4 += 1
-                        z4t += 1
-                    else:
-                        z4 += 1
-        print(f'{z1t}/{z1}, {z2t}/{z2},{z3t}/{z3},{z4t}/{z4}')
-        stroka = svobodn_string()
-        date = datetime.today()
-        date = f'{date.day}-{date.month}-{date.year}'
-        zapis_rez(user.name, user.klass.name, date, stroka, z1, z1t, z2, z2t, z3, z3t, z4, z4t)
-
-
-# google_otchet()
 
 # удалени ДЗ, выбор дз из общего списка для удаления
 def dz_delete1(message):
@@ -225,7 +186,6 @@ def theme_add(call):
     my_bot.send_message(user_id, 'Напишите название новой темы 👇')
 
 
-
 @my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'del dz')
 def dz_delete2(call):
     user_id = call.message.chat.id
@@ -237,6 +197,13 @@ def dz_delete2(call):
 
 @my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'del dz1')
 def dz_delete3(call):
+    # MultiDzTable.get(id=(call.data.split('_')[1])).delete_instance()
+    # my_bot.answer_callback_query(call.id, text="ДЗ удалено")
+    ### ver 2.0
+    for multitest in MultiDzTable.get(id=(call.data.split('_')[1])).tests:
+        for ex in multitest.tests_ex:
+            SelfTest_1t_ex.get(id=ex.id).delete_instance()
+        MultiTest.get(id=multitest.id).delete_instance()
     MultiDzTable.get(id=(call.data.split('_')[1])).delete_instance()
     my_bot.answer_callback_query(call.id, text="ДЗ удалено")
 
@@ -246,7 +213,7 @@ def create_multi_dz(message):
     user_id = message.chat.id
     global new_multi_dz_themes
     global new_multi_dz_theme
-    for theme in Theme.select():
+    for theme in Theme.select().where(Theme.archive == 'NO'):
         new_multi_dz_themes[theme.id] = Multi_dz_theme(tema=theme.name, id=theme.id, active='no', count=0)
     create_multi_dz_key(message)
 
@@ -437,17 +404,24 @@ def dz_check2(call):
     my_bot.send_message(user_id, 'Какое ДЗ открыть?', reply_markup=dz_klass_check)
 
 
+
+##выгрузка 2.0
 @my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'download multidz')
 def dz_download1(call):
-    analiz = {'z_1': 0, 'zt_1': 0, 'z_2': 0, 'zt_2': 0, 'z_3': 0, 'zt_3': 0, 'z_4': 0, 'zt_4': 0}
     user_id = call.message.chat.id
     dz = MultiDzTable.get(id=call.data.split('_')[1])
     dz_otchet = dz.tests
     shutil.copy2('shablon.docx', 'otchet_dz.docx')
     doc = Document('otchet_dz.docx')
+
+    tems = {}
+    for tema in dz.zadanie.split(';'):
+        tems[tema.split('_')[0]] = {'count': 0, 'true': 0}
+
     doc.add_heading(f'{dz.name} от {dz.date_create.strftime("%H:%M - %d.%m")}', 1)
-    table = doc.add_table(rows=2, cols=10)
+    table = doc.add_table(rows=len(dz.zadanie.split(';')), cols=2)
     table.style = 'Table Grid'
+    per = 0
     for userdz in dz_otchet:
         if userdz.date_finish == '':
             findate = 'незакончено'
@@ -459,11 +433,11 @@ def dz_download1(call):
         for test in userdz.tests_ex:
             if test.right == 'True':
                 text1 = 'Верно ✅'
-                analiz[f'zt_{test.test_ex_id.theme.name.split(" ")[1]}'] += 1
-                analiz[f'z_{test.test_ex_id.theme.name.split(" ")[1]}'] += 1
+                tems[f'{test.test_ex_id.theme.name}']['count'] += 1
+                tems[f'{test.test_ex_id.theme.name}']['true'] += 1
             else:
                 text1 = 'Неверно ❌'
-                analiz[f'z_{test.test_ex_id.theme.name.split(" ")[1]}'] += 1
+                tems[f'{test.test_ex_id.theme.name}']['count'] += 1
             doc.add_heading(text1, 2)
             file_info = my_bot.get_file(test.test_ex_id.photo)
             downloadfile = my_bot.download_file(file_info.file_path)
@@ -471,15 +445,18 @@ def dz_download1(call):
             with open(src, 'wb') as new_file:
                 new_file.write(downloadfile)
             doc.add_picture('D:/Oge test bot 2.0/documents/123.jpg', width=docx.shared.Cm(10))
-    for col in range(10):
-        cell = table.cell(0, col)
-        cell.text = f'Задание {col + 1}'
-    for col in range(1, 5):
-        cell = table.cell(1, col - 1)
-        if analiz[f"z_{col}"] > 0:
-            cell.text = f'{round((analiz[f"zt_{col}"] / analiz[f"z_{col}"]), 3) * 100}%'
-        else:
-            cell.text = f'-'
+
+    row = 0
+    for tem in tems:
+        print(tems.get(tem).get('true'))
+        print(tems.get(tem).get('count'))
+        print('---1')
+        table.cell(row, 0).text = str(tem)
+        print('---2')
+        table.cell(row, 1).text = str(round(tems.get(tem).get('true') / tems.get(tem).get('count'), 3) * 100)
+        print('---3')
+        row += 1
+
     doc.save('otchet_dz.docx')
     f = open('otchet_dz.docx', "rb")
     my_bot.send_document(user_id, f)
@@ -515,13 +492,27 @@ def dz_check3(call):
         my_bot.send_message(user_id, f"Ответ юзера: {ex.user_answer} {text}")
 
 
+@my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'del theme')
+def del_theme(call):
+    theme_id = call.data.split('_')[1]
+    Theme.update({Theme.archive: 'YES'}).where(Theme.id == theme_id).execute()
+    my_bot.answer_callback_query(call.id, text="Тема помещена в архив")
+
+
+@my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'red theme')
+def red_theme(call):
+    global db_edit_status
+    user_id = call.message.chat.id
+    db_edit_status = f'Жду нового названия темы для_{call.data.split("_")[1]}'
+    my_bot.send_message(user_id, 'Введите новое название темы 👇')
+
 @my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'example add')
 def OGE_DB_APPEND3(call):
     global db_append_status
     global new_example
     user_id = call.message.chat.id
     db_append_status = 'ожидание фото'
-    new_example = Example(theme=Theme.get(id=call.data.split('_')[1]), photo='', answer='')
+    new_example = Example(theme=Theme.get(id=call.data.split('_')[1]), photo='', answer='', archive='NO')
     my_bot.send_message(user_id, 'Пришлите фото нового задания')
 
 
@@ -532,8 +523,11 @@ def OGE_DB_EDIT2(call):
     global edit_example
     user_id = call.message.chat.id
     db_edit_status = 'выбор задания'
-    edit_example = Example(theme=Theme.get(id=call.data.split('_')[1]), photo='', answer='')
-    allTestsOfTheme = TestExample.select().where(TestExample.theme == Theme.get(id=edit_example.theme))
+    edit_example = Example(theme=Theme.get(id=call.data.split('_')[1]), photo='', answer='', archive='NO')
+    # allTestsOfTheme = TestExample.select().where(
+    #     TestExample.theme == Theme.get(id=edit_example.theme) and TestExample.archive == 'NO')
+    allTestsOfTheme = TestExample.select().where(
+        (TestExample.theme == Theme.get(id=edit_example.theme))).where(TestExample.archive == 'NO')
     for ex in allTestsOfTheme:
         my_bot.send_message(user_id, f'Задание № {ex.id}   Ответ: {ex.answer}')
         my_bot.send_photo(user_id, ex.photo)
@@ -559,8 +553,11 @@ def OGE_DB_DEL1(call):
 @my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'delete test1')
 def OGE_DB_DEL2(call):
     # user_id = call.message.chat.id
-    TestExample.get(id=(call.data.split('_')[1])).delete_instance()
-    my_bot.answer_callback_query(call.id, text="Задание удалено")
+    # TestExample.get(id=(call.data.split('_')[1])).delete_instance()
+    ex_id = call.data.split('_')[1]
+    TestExample.update({TestExample.archive: 'YES'}).where(
+        TestExample.id == TestExample.get(id=ex_id)).execute()
+    my_bot.answer_callback_query(call.id, text="Задание помещено в архив")
 
 
 # изменение существующего задания выбор нового фото или овтета (шаг4)
@@ -607,10 +604,6 @@ def main(message):
         global new_example
         global edit_example
         user_id = message.chat.id
-        # if db_append_status == 'ожидание фото':  # добавление заданий, шаг4, получили фото, ждем ответа
-        #     new_example.photo = message.photo[0].file_id
-        #     my_bot.send_message(user_id, 'Введите ответ на задание')
-        #     db_append_status = 'ожидание ответа'
         if db_append_status == 'ожидание фото':  # добавление заданий, шаг4, получили фото, ждем ответа
             new_example.photo = message.photo[len(message.photo) - 1].file_id
             my_bot.send_message(user_id, 'Введите ответ на задание')
@@ -625,7 +618,7 @@ def main(message):
 
 # добавление заданий, выбор темы для добавления (шаг2)
 def OGE_DB_APPEND1(user_id):
-    test_themes = Theme.select()
+    test_themes = Theme.select().where(Theme.archive == 'NO')
     choice_theme_keyboard = types.InlineKeyboardMarkup()
     for theme in test_themes:
         choice_theme_keyboard.row(types.InlineKeyboardButton(text=theme.name,
@@ -635,7 +628,7 @@ def OGE_DB_APPEND1(user_id):
 
 # изменение существующих заданий, выбор темы (шаг2)
 def OGE_DB_EDIT1(user_id):
-    test_themes = Theme.select()
+    test_themes = Theme.select().where(Theme.archive == 'NO')
     choice_theme_keyboard = types.InlineKeyboardMarkup()
     for theme in test_themes:
         choice_theme_keyboard.row(types.InlineKeyboardButton(text=theme.name,
@@ -896,4 +889,4 @@ def multitest_sdvig_del(user_id):
 
 
 if __name__ == "__main__":
-    my_bot.polling(none_stop=False)
+    my_bot.polling(none_stop=True, interval=0, timeout=20)
