@@ -225,3 +225,5 @@ def multidz_count_sum(zadanie):
 # for i in tem:
 #     Theme.create(name=i)
 # Theme.create(name='Декодирование Фано')
+
+#UserTab.get(name='Шеткин Антое').delete_instance()

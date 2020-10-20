@@ -8,12 +8,13 @@ import docx
 import shutil
 from googtab import svobodn_string, zapis_rez
 from my_func import *
+import time
 
 # apihelper.proxy = {'https': 'socks5://190737618:TsT9nZls@orbtl.s5.opennetwork.cc:999'}  # работал до 29 мая
 # apihelper.proxy = {'https': 'socks5://142.93.170.92:1080'}  # 30 июня - 1
 # apihelper.proxy = {'https': 'socks5://165.22.65.160:19488'}  # 30 июня - 2
 # apihelper.proxy = {'https': 'socks5://78.46.218.20:12041'}  # 30 июня - 3
-apihelper.proxy = {'https': 'socks5://1rje3TFpVJ:Er2GduoOmw@45.92.172.55:55276'}  # куплена до 8 сентября
+#apihelper.proxy = {'https': 'socks5://1rje3TFpVJ:Er2GduoOmw@45.92.172.55:55276'}  # куплена до 8 сентября
 my_bot = telebot.TeleBot('1245059539:AAEL9lRvA46urwPZmWessOONPgP920cjaTg')
 init_db()
 
@@ -76,7 +77,7 @@ def start_message(message):
 @my_bot.message_handler(content_types=['text'])
 def main(message):
     user_id = message.chat.id
-    print('На главную')
+    print('Действие пользователя -->', UserTab.get(teleg_id=user_id).name, datetime.now())
     # для учителя--------------------------------------------------------------------
     global db_append_status
     global new_example
@@ -487,7 +488,7 @@ def dz_check3(call):
             else:
                 findate = dz.date_finish.strftime("%H:%M - %d.%m")
             dz_user_check.row(types.InlineKeyboardButton(
-                text=f'{str(dz.user.name).ljust(20, "=")} верно {str(dz.right_count).rjust(2, " ")} из {str(dz.ex_count).rjust(2, " ")} \n {dz.date_start.strftime("%H:%M - %d.%m")}/{findate}',
+                text=f'{str(dz.user.name).ljust(25, "_")} верно {str(dz.right_count).rjust(2, " ")} из {str(dz.ex_count).rjust(2, " ")} \n {dz.date_start.strftime("%H:%M - %d.%m")}/{findate}',
                 callback_data=f"open user multidz_{dz.id}"))
     my_bot.send_message(user_id, 'Какой тест открыть??', reply_markup=dz_user_check)
 
@@ -644,7 +645,8 @@ def OGE_DB_EDIT1(user_id):
     test_themes = Theme.select().where(Theme.archive == 'NO')
     choice_theme_keyboard = types.InlineKeyboardMarkup()
     for theme in test_themes:
-        choice_theme_keyboard.row(types.InlineKeyboardButton(text=theme.name,
+        count = theme.examples.count()
+        choice_theme_keyboard.row(types.InlineKeyboardButton(text=f'{theme.name} - {count}',
                                                              callback_data=f'theme edit_{theme.id}'))
     my_bot.send_message(user_id, 'Какую тему открыть для изменения?', reply_markup=choice_theme_keyboard)
 
@@ -767,11 +769,8 @@ def continue_multidz1(call):
 # создание мультитеста дз по шаблону и запуск теста
 @my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'choice multidz')
 def create_multi_dz1(call):
-    print('---1')
     dz = MultiDzTable.get(id=call.data.split('_')[1])
-    print('---2')
     user_id = call.message.chat.id
-    print(dz.zadanie)
     tid_dz = MultiTest.create(multidz_id=dz.id,
                               user=UserTab.get(teleg_id=user_id),
                               ex_data=gen_numex_multi_dz(dz.zadanie),
@@ -780,10 +779,8 @@ def create_multi_dz1(call):
                               right_count=0,
                               date_start=datetime.now(),
                               date_finish='').id
-    print('---3')
     UserTab.update({UserTab.cur_multitest: tid_dz}).where(UserTab.teleg_id == user_id).execute()
     UserTab.update({UserTab.status: 'мультитест старт'}).where(UserTab.teleg_id == user_id).execute()
-    print('---4')
     start_multitest(call.message)
 
 
@@ -792,7 +789,6 @@ def start_multitest(message):
     ex_id = MultiTest.get(id=UserTab.get(teleg_id=user_id).cur_multitest).ex_data[1:-1].split(
         ', ')  # срезом убирает квадратные скобки и сплитуем
     my_bot.send_message(user_id, f'Заданий осталось {len(ex_id)}')
-    print(ex_id)
     my_bot.send_photo(user_id, TestExample.get(id=ex_id[0]).photo)
 
     propusk_theme_selftest_1t = types.InlineKeyboardMarkup()
@@ -806,6 +802,7 @@ def start_multitest(message):
 @my_bot.callback_query_handler(func=lambda call: call.data == 'propusk_multitest')
 def call_propusk_multitest(call):
     user_id = call.message.chat.id
+    print(f'Пользователь {UserTab.get(teleg_id=user_id).name} пропустил задание')
     UserTab.update({UserTab.status: 'мультитест старт'}).where(UserTab.teleg_id == user_id).execute()
     multitest_sdvig(user_id)
     start_multitest(call.message)
@@ -815,22 +812,20 @@ def do_multitest(message):
     ex_id = []
     user_id = message.chat.id
     ex_id = MultiTest.get(id=UserTab.get(teleg_id=user_id).cur_multitest).ex_data[1:-1].split(', ')
-    print('--1--', MultiTest.get(id=UserTab.get(teleg_id=user_id).cur_multitest).done_ex_count)
-    print('--2--', MultiTest.get(id=UserTab.get(teleg_id=user_id).cur_multitest).ex_count)
+
     # пока кол-во выполненых заданий меньше общего кол-ва заданий в тесте
     if MultiTest.get(id=UserTab.get(teleg_id=user_id).cur_multitest).done_ex_count < MultiTest.get(
             id=UserTab.get(teleg_id=user_id).cur_multitest).ex_count:
         # проверяем правильность ответа
-        print('ответ юзера ', message.text)
-        print('верный ответ ', TestExample.get(id=ex_id[0]).answer)
+
         if TestExample.get(id=ex_id[0]).answer == message.text.upper():
             ranswer = 'True'
-            print('ответ верен-1')
+            print(f'пользователь {UserTab.get(teleg_id=user_id).name} ввел верный ответ')
             MultiTest.update({MultiTest.right_count: MultiTest.right_count + 1}).where(
                 MultiTest.id == UserTab.get(teleg_id=user_id).cur_multitest).execute()
         else:
             ranswer = 'False'
-            print('ответ неверен')
+            print(f'пользователь {UserTab.get(teleg_id=user_id).name} ввел НЕверный ответ')
         MultiTest.update({MultiTest.done_ex_count: MultiTest.done_ex_count + 1}).where(
             MultiTest.id == UserTab.get(teleg_id=user_id).cur_multitest).execute()
         # создаем запись о задании в БД
@@ -841,7 +836,7 @@ def do_multitest(message):
                               right=ranswer,
                               date=datetime.today(),
                               multitest_id=UserTab.get(teleg_id=user_id).cur_multitest)
-        print('запись строки задания')
+
         # сдвиг номер задания
         ex_id = multitest_sdvig_del(user_id)
         # выдаем следующее задание
@@ -850,7 +845,6 @@ def do_multitest(message):
                 id=UserTab.get(teleg_id=user_id).cur_multitest).ex_count:
             my_bot.send_message(user_id, f'Заданий осталось {len(ex_id)}')
             my_bot.send_photo(user_id, TestExample.get(id=ex_id[0]).photo)
-            print('верный ответ на задание ', TestExample.get(id=ex_id[0]).answer)
             propusk_theme_selftest_1t = types.InlineKeyboardMarkup()
             propusk_theme_selftest_1t.row(types.InlineKeyboardButton(text='Пропустить задание',
                                                                      callback_data='propusk_multitest'))
@@ -901,5 +895,10 @@ def multitest_sdvig_del(user_id):
     return ex_id
 
 
-if __name__ == "__main__":
-    my_bot.polling(none_stop=True, interval=0, timeout=20)
+if __name__ == '__main__':
+    while True:
+        try:
+            my_bot.polling(none_stop=False, interval=0, timeout=20)
+        except Exception as e:
+            print(e)
+            time.sleep(5)
