@@ -14,8 +14,8 @@ import time
 # apihelper.proxy = {'https': 'socks5://142.93.170.92:1080'}  # 30 июня - 1
 # apihelper.proxy = {'https': 'socks5://165.22.65.160:19488'}  # 30 июня - 2
 # apihelper.proxy = {'https': 'socks5://78.46.218.20:12041'}  # 30 июня - 3
-#apihelper.proxy = {'https': 'socks5://1rje3TFpVJ:Er2GduoOmw@45.92.172.55:55276'}  # куплена до 8 сентября
-my_bot = telebot.TeleBot('1245059539:AAEL9lRvA46urwPZmWessOONPgP920cjaTg')
+# apihelper.proxy = {'https': 'socks5://1rje3TFpVJ:Er2GduoOmw@45.92.172.55:55276'}  # куплена до 8 сентября
+my_bot = telebot.TeleBot('1245059539:AAEL9lRvA46urwPZmWessOONPgP920cjaTg', num_threads=4)
 init_db()
 
 ##для учителя
@@ -61,13 +61,15 @@ def start_message(message):
                            name='',
                            klass='',
                            cur_selftest_1t='',
-                           reg_status='Нет фио',
+                           reg_status='Нет фам',
                            reg_date=datetime.now(),
                            status='',
                            cur_multitest='нет')
-        if UserTab.get(teleg_id=user_id).reg_status == 'Нет фио':
+        if UserTab.get(teleg_id=user_id).reg_status == 'Нет фам':
             my_bot.send_message(user_id, 'Привет🖐, давай тебя зарегистрируем в системе.')
-            my_bot.send_message(user_id, 'Введи свои Фамилию и Имя (Например, Иванов Пётр)')
+            my_bot.send_message(user_id, 'Введи свою Фамилию')
+        if UserTab.get(teleg_id=user_id).reg_status == 'Нет имени':
+            my_bot.send_message(user_id, 'Введи своё Имя')
         if UserTab.get(teleg_id=user_id).reg_status == 'Выполнена':
             my_bot.send_message(user_id, f'Привет🖐, {UserTab.get(teleg_id=user_id).name}',
                                 reply_markup=main_student_markup)
@@ -77,7 +79,7 @@ def start_message(message):
 @my_bot.message_handler(content_types=['text'])
 def main(message):
     user_id = message.chat.id
-    print('Действие пользователя -->', UserTab.get(teleg_id=user_id).name, datetime.now())
+
     # для учителя--------------------------------------------------------------------
     global db_append_status
     global new_example
@@ -144,23 +146,28 @@ def main(message):
             clearstatus()
 
         elif db_edit_status.split('_')[0] == 'Жду нового названия темы для':
-            Theme.update(name=message.text).where(Theme.id==int(db_edit_status.split('_')[1])).execute()
+            Theme.update(name=message.text).where(Theme.id == int(db_edit_status.split('_')[1])).execute()
             my_bot.send_message(user_id, 'Название темы изменено')
     # для студента--------------------------------------------------------------------
     else:
         if UserTab.select().where(UserTab.teleg_id == user_id).count() == 0:
             my_bot.send_message(user_id, 'Вы не зарегистрированы. Напишите команду /start')
         else:
-            if UserTab.get(teleg_id=user_id).reg_status == 'Нет фио':  # если нет фио, записываем и даем выбрать класс
-                reg_fio(message)
+            if UserTab.get(teleg_id=user_id).reg_status == 'Нет фам':  # если нет фам, записываем и даем выбрать класс
+                reg_fam(message)
+            elif UserTab.get(
+                    teleg_id=user_id).reg_status == 'Нет имени':  # если нет фам, записываем и даем выбрать класс
+                reg_name(message)
+
             elif UserTab.get(
                     teleg_id=user_id).reg_status == 'Выполнена' and message.text == 'На главную':  # если юзер зареган, предлагаем ему выбор функций
                 UserTab.update({UserTab.status: ''}).where(UserTab.teleg_id == user_id).execute()
                 user_function(message)
-
-            if UserTab.get(teleg_id=user_id).status == 'мультитест старт':
+                print(f'{datetime.now()} 👉🏻 {UserTab.get(teleg_id=user_id).name} 👉🏻 {message.text}')
+            elif UserTab.get(teleg_id=user_id).status == 'мультитест старт':
                 start_multitest(message)
             elif UserTab.get(teleg_id=user_id).status == 'мультитест в процессе':
+                print(f'{datetime.now()} 👉🏻 {UserTab.get(teleg_id=user_id).name} 👉🏻 {message.text}')
                 do_multitest(message)
             my_bot.send_message(user_id, f'☝☝☝',
                                 reply_markup=main_student_markup)
@@ -405,10 +412,6 @@ def dz_check2(call):
     my_bot.send_message(user_id, 'Какое ДЗ открыть?', reply_markup=dz_klass_check)
 
 
-
-
-
-
 ##выгрузка 2.0
 @my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'download multidz')
 def dz_download1(call):
@@ -457,16 +460,14 @@ def dz_download1(call):
                     new_file.write(downloadfile)
                 doc.add_picture('D:/Oge test bot 2.0/documents/123.jpg', width=docx.shared.Cm(10))
             per += 1
-            my_bot.edit_message_text(chat_id=user_id,message_id=nn.message_id,text= f'выгрузка {per}/{dz_otchet.count()}')
+            my_bot.edit_message_text(chat_id=user_id, message_id=nn.message_id,
+                                     text=f'выгрузка {per}/{dz_otchet.count()}')
     row = 0
     for tem in tems:
-        print(tems.get(tem).get('true'))
-        print(tems.get(tem).get('count'))
-        print('---1')
         table.cell(row, 0).text = str(tem)
-        print('---2')
+
         table.cell(row, 1).text = str(round(tems.get(tem).get('true') / tems.get(tem).get('count'), 3) * 100)
-        print('---3')
+
         row += 1
 
     doc.save('otchet_dz.docx')
@@ -519,6 +520,7 @@ def red_theme(call):
     user_id = call.message.chat.id
     db_edit_status = f'Жду нового названия темы для_{call.data.split("_")[1]}'
     my_bot.send_message(user_id, 'Введите новое название темы 👇')
+
 
 @my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'example add')
 def OGE_DB_APPEND3(call):
@@ -665,9 +667,17 @@ def clearstatus():
 
 ##для ученика-------------------------------------------------------------------------
 # продолжение регистрации, после ввода фио
-def reg_fio(message):
+def reg_fam(message):
     user_id = message.chat.id
     UserTab.update({UserTab.name: message.text}).where(UserTab.teleg_id == user_id).execute()
+    UserTab.update({UserTab.reg_status: 'Нет имени'}).where(UserTab.teleg_id == user_id).execute()
+    my_bot.send_message(user_id, 'Напиши свое имя')
+
+
+def reg_name(message):
+    user_id = message.chat.id
+    fam = UserTab.get(teleg_id=user_id).name
+    UserTab.update({UserTab.name: (fam + ' ' + message.text)}).where(UserTab.teleg_id == user_id).execute()
     UserTab.update({UserTab.reg_status: 'Нет класса'}).where(UserTab.teleg_id == user_id).execute()
     choice_klass = types.InlineKeyboardMarkup()
     for klass in Klass.select():
@@ -699,65 +709,69 @@ def user_function(message):
 def user_check_multi_dz(call):
     user_id = call.message.chat.id
 
-    mass_mult_dz = UserTab.get(teleg_id=user_id).klass.multidz_po_klassu.select()
-    my_bot.send_message(user_id, 'Какое Мульти-ДЗ открыть? ❓')
-    if len(mass_mult_dz) > 4:
-        r = 5
-    else:
-        r = len(mass_mult_dz) + 1
-    for i in range(1, r):
-        z1 = mass_mult_dz[-i]
-        if MultiDzTable.get(id=z1.id).tests.select().where(
-                MultiTest.user == UserTab.get(teleg_id=user_id)).count() == 0:
-            status_dz = 'не выполнено ❌'
-            choice_dz = types.InlineKeyboardMarkup()
-            choice_dz.row(types.InlineKeyboardButton(
-                text='Выполнить',
-                callback_data=f'choice multidz_{z1.id}')
-            )
-            my_bot.send_message(user_id, f'{z1.name} - {status_dz}', reply_markup=choice_dz)
+    if UserTab.select().where(UserTab.teleg_id == user_id).count() > 0:
+        print(f'{datetime.now()} 👉🏻 {UserTab.get(teleg_id=user_id).name} 👉🏻 смотрит список ДЗ')
+        mass_mult_dz = UserTab.get(teleg_id=user_id).klass.multidz_po_klassu.select()
+        my_bot.send_message(user_id, 'Какое Мульти-ДЗ открыть? ❓')
+        if len(mass_mult_dz) > 4:
+            r = 5
         else:
-            status_dz = 'не закончено ✍🏻'
-            # проверка выполнения дз
-            for test in UserTab.get(teleg_id=user_id).multitests.select().where(MultiTest.multidz_id == z1.id):
-                if test.ex_data == '[]':
-                    status_dz = 'выполнено ✅'
-            if status_dz == 'выполнено ✅':
-                if MultiDzTable.get(id=z1.id).tests.select().where(
-                        MultiTest.user == UserTab.get(
-                            teleg_id=user_id)).count() < 3:  # max кол-во попыток выполнения ДЗ
-                    if MultiDzTable.get(id=z1.id).tests.select().where(
-                            MultiTest.user == UserTab.get(teleg_id=user_id))[-1].ex_data == '[]':
-                        choice_dz = types.InlineKeyboardMarkup()
-                        choice_dz.row(types.InlineKeyboardButton(
-                            text='Переделать 🔄',
-                            callback_data=f'choice multidz_{z1.id}'))
-                        my_bot.send_message(user_id, f'➡️{z1.name} - {status_dz}', reply_markup=choice_dz)
-                    else:
-                        tid = MultiDzTable.get(id=z1.id).tests.select().where(
-                            MultiTest.user == UserTab.get(teleg_id=user_id))[-1].id
-                        choice_dz = types.InlineKeyboardMarkup()
-                        choice_dz.row(types.InlineKeyboardButton(
-                            text='Переделать 🔄',
-                            callback_data=f'choice multidz_{z1.id}'),
-                            types.InlineKeyboardButton(
-                                text='Продолжить последнюю попытку ',
-                                callback_data=f'continue multidz_{tid}')
-                        )
-                        my_bot.send_message(user_id, f'➡️{z1.name} - {status_dz}', reply_markup=choice_dz)
-                else:
-                    my_bot.send_message(user_id, f'➡️{z1.name} - {status_dz}')
-            else:
-                status_dz = 'не закончено ✍🏻'
-                tid = MultiDzTable.get(id=z1.id).tests.select().where(
-                    MultiTest.user == UserTab.get(teleg_id=user_id))[-1].id
+            r = len(mass_mult_dz) + 1
+        for i in range(1, r):
+            z1 = mass_mult_dz[-i]
+            if MultiDzTable.get(id=z1.id).tests.select().where(
+                    MultiTest.user == UserTab.get(teleg_id=user_id)).count() == 0:
+                status_dz = 'не выполнено ❌'
                 choice_dz = types.InlineKeyboardMarkup()
                 choice_dz.row(types.InlineKeyboardButton(
-                    text='Продолжить последнюю попытку',
-                    callback_data=f'continue multidz_{tid}'))
-                my_bot.send_message(user_id, f'➡️{z1.name} - {status_dz}', reply_markup=choice_dz)
-        # my_bot.send_message(user_id, f'{z1.name} - {status_dz}', reply_markup=choice_dz)
-
+                    text='Выполнить',
+                    callback_data=f'choice multidz_{z1.id}')
+                )
+                my_bot.send_message(user_id, f'{z1.name} - {status_dz}', reply_markup=choice_dz)
+            else:
+                status_dz = 'не закончено ✍🏻'
+                # проверка выполнения дз
+                for test in UserTab.get(teleg_id=user_id).multitests.select().where(MultiTest.multidz_id == z1.id):
+                    if test.ex_data == '[]':
+                        status_dz = 'выполнено ✅'
+                if status_dz == 'выполнено ✅':
+                    if MultiDzTable.get(id=z1.id).tests.select().where(
+                            MultiTest.user == UserTab.get(
+                                teleg_id=user_id)).count() < 3:  # max кол-во попыток выполнения ДЗ
+                        if MultiDzTable.get(id=z1.id).tests.select().where(
+                                MultiTest.user == UserTab.get(teleg_id=user_id))[-1].ex_data == '[]':
+                            choice_dz = types.InlineKeyboardMarkup()
+                            choice_dz.row(types.InlineKeyboardButton(
+                                text='Переделать 🔄',
+                                callback_data=f'choice multidz_{z1.id}'))
+                            my_bot.send_message(user_id, f'➡️{z1.name} - {status_dz}', reply_markup=choice_dz)
+                        else:
+                            tid = MultiDzTable.get(id=z1.id).tests.select().where(
+                                MultiTest.user == UserTab.get(teleg_id=user_id))[-1].id
+                            choice_dz = types.InlineKeyboardMarkup()
+                            choice_dz.row(types.InlineKeyboardButton(
+                                text='Переделать 🔄',
+                                callback_data=f'choice multidz_{z1.id}'),
+                                types.InlineKeyboardButton(
+                                    text='Продолжить последнюю попытку ',
+                                    callback_data=f'continue multidz_{tid}')
+                            )
+                            my_bot.send_message(user_id, f'➡️{z1.name} - {status_dz}', reply_markup=choice_dz)
+                    else:
+                        my_bot.send_message(user_id, f'➡️{z1.name} - {status_dz}')
+                else:
+                    status_dz = 'не закончено ✍🏻'
+                    tid = MultiDzTable.get(id=z1.id).tests.select().where(
+                        MultiTest.user == UserTab.get(teleg_id=user_id))[-1].id
+                    choice_dz = types.InlineKeyboardMarkup()
+                    choice_dz.row(types.InlineKeyboardButton(
+                        text='Продолжить последнюю попытку',
+                        callback_data=f'continue multidz_{tid}'))
+                    my_bot.send_message(user_id, f'➡️{z1.name} - {status_dz}', reply_markup=choice_dz)
+            # my_bot.send_message(user_id, f'{z1.name} - {status_dz}', reply_markup=choice_dz)
+    else:
+        my_bot.send_message(user_id, 'Прости, я вчера потерял память. Напиши в чат /start , чтобы зарегистрироваться')
+        print(f'Незарегистрированный пользователь {user_id} попробовал открыть список ДЗ')
 
 @my_bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'continue multidz')
 def continue_multidz1(call):
@@ -771,19 +785,22 @@ def continue_multidz1(call):
 def create_multi_dz1(call):
     dz = MultiDzTable.get(id=call.data.split('_')[1])
     user_id = call.message.chat.id
-    tid_dz = MultiTest.create(multidz_id=dz.id,
-                              user=UserTab.get(teleg_id=user_id),
-                              ex_data=gen_numex_multi_dz(dz.zadanie),
-                              ex_count=multidz_count_sum(dz.zadanie),
-                              done_ex_count=0,
-                              right_count=0,
-                              date_start=datetime.now(),
-                              date_finish='').id
-    UserTab.update({UserTab.cur_multitest: tid_dz}).where(UserTab.teleg_id == user_id).execute()
-    UserTab.update({UserTab.status: 'мультитест старт'}).where(UserTab.teleg_id == user_id).execute()
-    start_multitest(call.message)
-
-
+    if UserTab.select().where(UserTab.teleg_id == user_id).count() > 0:
+        tid_dz = MultiTest.create(multidz_id=dz.id,
+                                  user=UserTab.get(teleg_id=user_id),
+                                  ex_data=gen_numex_multi_dz(dz.zadanie),
+                                  ex_count=multidz_count_sum(dz.zadanie),
+                                  done_ex_count=0,
+                                  right_count=0,
+                                  date_start=datetime.now(),
+                                  date_finish='').id
+        UserTab.update({UserTab.cur_multitest: tid_dz}).where(UserTab.teleg_id == user_id).execute()
+        UserTab.update({UserTab.status: 'мультитест старт'}).where(UserTab.teleg_id == user_id).execute()
+        print(f'{datetime.now()} 👉🏻 {UserTab.get(teleg_id=user_id).name} 👉🏻 начал выполнение теста')
+        start_multitest(call.message)
+    else:
+        my_bot.send_message(user_id, 'Прости, я на днях потерял память. Нужно снова зарегистрироваться. Напиши в чат /start')
+        print(f'Незарегистрированный пользователь {user_id} пытался начать тест')
 def start_multitest(message):
     user_id = message.chat.id
     ex_id = MultiTest.get(id=UserTab.get(teleg_id=user_id).cur_multitest).ex_data[1:-1].split(
@@ -802,10 +819,12 @@ def start_multitest(message):
 @my_bot.callback_query_handler(func=lambda call: call.data == 'propusk_multitest')
 def call_propusk_multitest(call):
     user_id = call.message.chat.id
-    print(f'Пользователь {UserTab.get(teleg_id=user_id).name} пропустил задание')
-    UserTab.update({UserTab.status: 'мультитест старт'}).where(UserTab.teleg_id == user_id).execute()
-    multitest_sdvig(user_id)
-    start_multitest(call.message)
+    if UserTab.select().where(UserTab.teleg_id == user_id).count() > 0:
+        if UserTab.get(teleg_id=user_id).cur_multitest != 'нет':
+            print(f'Пользователь {UserTab.get(teleg_id=user_id).name} пропустил задание')
+            UserTab.update({UserTab.status: 'мультитест старт'}).where(UserTab.teleg_id == user_id).execute()
+            multitest_sdvig(user_id)
+            start_multitest(call.message)
 
 
 def do_multitest(message):
@@ -857,6 +876,8 @@ def do_multitest(message):
             my_bot.send_message(user_id,
                                 f'Результат {MultiTest.get(id=UserTab.get(teleg_id=user_id).cur_multitest).right_count} из {MultiTest.get(id=UserTab.get(teleg_id=user_id).cur_multitest).ex_count}')
             UserTab.update(cur_multitest='нет').where(UserTab.teleg_id == user_id).execute()
+            UserTab.update(status='').where(UserTab.teleg_id == user_id).execute()
+            print(f'{datetime.now()} 👉🏻 {UserTab.get(teleg_id=user_id).name} 👉🏻 закончил тест')
     else:
         my_bot.send_message(user_id, 'Тест закончен')
         MultiTest.update(date_finish=datetime.now()).where(
@@ -864,19 +885,21 @@ def do_multitest(message):
         my_bot.send_message(user_id,
                             f'Результат {MultiTest.get(id=UserTab.get(teleg_id=user_id).cur_multitest).right_count} из {MultiTest.get(id=UserTab.get(teleg_id=user_id).cur_multitest).ex_count}')
         UserTab.update(cur_multitest='нет').where(UserTab.teleg_id == user_id).execute()
+        UserTab.update(status='').where(UserTab.teleg_id == user_id).execute()
+        print(f'пользователь {UserTab.get(teleg_id=user_id).name} закончил тест')
 
 
 # сдвиг номера задания на следующий без удаления
 def multitest_sdvig(user_id):
     ex_id = MultiTest.get(id=UserTab.get(teleg_id=user_id).cur_multitest).ex_data[1:-1].split(', ')
-    print('>>1>', ex_id)
+
     first = ex_id[0]
     for i in range(0, len(ex_id) - 1):
         ex_id[i] = ex_id[i + 1]
     ex_id[len(ex_id) - 1] = first
     for i in range(0, len(ex_id)):
         ex_id[i] = int(ex_id[i])
-    print('>>2>', ex_id)
+
     MultiTest.update({MultiTest.ex_data: ex_id}).where(
         MultiTest.id == UserTab.get(teleg_id=user_id).cur_multitest).execute()
     return ex_id
@@ -886,19 +909,24 @@ def multitest_sdvig(user_id):
 def multitest_sdvig_del(user_id):
     ex_id = MultiTest.get(id=UserTab.get(teleg_id=user_id).cur_multitest).ex_data[1:-1].split(', ')
     ex_id.pop(0)
-    print('>>>', ex_id)
+
     for i in range(0, len(ex_id)):
         ex_id[i] = int(ex_id[i])
-    print('>>>', ex_id)
+
     MultiTest.update({MultiTest.ex_data: ex_id}).where(
         MultiTest.id == UserTab.get(teleg_id=user_id).cur_multitest).execute()
     return ex_id
 
 
+er_flag = False
 if __name__ == '__main__':
     while True:
         try:
+            if er_flag == True:
+                my_bot.send_message(teacher, 'У бота ошибка 😢')
+            er_flag = False
             my_bot.polling(none_stop=False, interval=0, timeout=20)
         except Exception as e:
             print(e)
+            er_flag = True
             time.sleep(5)

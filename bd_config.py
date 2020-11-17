@@ -165,15 +165,15 @@ def gen_numex_multi_dz(zadanie):
         for ex in part_ex:
             ex_data_part.append(ex.id)
         ex_data += random.sample(ex_data_part, int(part.split('_')[1]))
-        print(ex_data)
+
     return ex_data
 
 def multidz_count_sum(zadanie):
     count_sum = 0
-    print('считаем')
+
     for part in zadanie.split(';'):
         count_sum += int(part.split('_')[1])
-    print(count_sum, 'заданий')
+
     return count_sum
 
 
@@ -225,5 +225,7 @@ def multidz_count_sum(zadanie):
 # for i in tem:
 #     Theme.create(name=i)
 # Theme.create(name='Декодирование Фано')
+#UserTab.get(name='Саидова Сабрина').delete_instance()
+#UserTab.update({UserTab.name: 'Бучковский Всеволод'}).where(UserTab.name=='На главную 10').execute()
 
-#UserTab.get(name='Шеткин Антое').delete_instance()
+#print(UserTab.get(name='Саидова Сабрина').klass.name)
